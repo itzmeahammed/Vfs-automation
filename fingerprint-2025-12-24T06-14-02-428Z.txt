@@ -1,0 +1,78 @@
+
+╔════════════════════════════════════════════════════════════════╗
+║           BROWSER FINGERPRINT REPORT                           ║
+║           Generated: 24/12/2025, 10:14:02 am                    ║
+╚════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌐 BROWSER INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+User Agent:     Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+Platform:       Win32
+Language:       en-US
+Languages:      en-US
+CPU Cores:      8
+Device Memory:  N/A GB
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🖥️  SCREEN INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Screen Size:    1920 x 1080
+Available Size: 1920 x 1080
+Color Depth:    24
+Pixel Depth:    24
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎮 WEBGL (CRITICAL - Cloudflare checks this!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Vendor:         WebKit
+Renderer:       WebKit WebGL
+
+⚠️  If these say "SwiftShader" or "ANGLE" = BOT DETECTED!
+✅ Should say "Google Inc." or "Intel" or "NVIDIA"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 BOT DETECTION FLAGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+navigator.webdriver:    false ✅ Hidden
+Chrome Object:          ✅ Present
+Chrome Runtime:         ❌ Missing
+Selenium Attribute:     ✅ Clean
+PhantomJS:              ✅ Clean
+Window.webdriver:       ✅ Clean
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔌 PLUGINS & MIME TYPES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Plugins Count:  5
+✅ Plugins detected
+
+Mime Types:     2
+✅ Mime types detected
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🌍 TIMEZONE & LOCALE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Timezone:       Asia/Dubai
+Offset:         -240 minutes
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📏 WINDOW DIMENSIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Outer:          1554 x 882
+Inner:          1920 x 1080
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 FOUND 1 ISSUE(S):
+   ❌ Chrome runtime missing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 NEXT STEPS:
+1. Run this on BOTH systems (laptop & office PC)
+2. Save both reports
+3. Compare line by line - differences = the problem!
+4. Focus on WebGL and Bot Detection sections
+

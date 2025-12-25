@@ -1,0 +1,7 @@
+node_modules/
+dist/
+browser-profiles/
+*.log
+.env
+.env.local
+error-*.png

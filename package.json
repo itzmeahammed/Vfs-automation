@@ -1,0 +1,38 @@
+{
+    "name": "human-indistinguishable-automation",
+    "version": "1.0.0",
+    "description": "A web automation system behaviorally indistinguishable from real human users",
+    "type": "module",
+    "main": "dist/index.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "start:headed": "node dist/index.js --headed",
+        "start:headless": "node dist/index.js --headless",
+        "dev": "tsx src/index.ts",
+        "dev:headless": "tsx src/index.ts --headless",
+        "dev:headed": "tsx src/index.ts --headed",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:e2e": "tsx src/tests/e2e.test.ts",
+        "setup": "npx playwright install chromium",
+        "lint": "tsc --noEmit",
+        "clean": "rmdir /s /q dist 2>nul & rmdir /s /q browser-profiles 2>nul & echo Cleaned"
+    },
+    "dependencies": {
+        "chalk": "^5.3.0",
+        "dotenv": "^16.3.1",
+        "playwright": "^1.40.0",
+        "playwright-extra": "^4.3.6",
+        "puppeteer-extra-plugin-stealth": "^2.11.2"
+    },
+    "devDependencies": {
+        "@types/node": "^20.10.0",
+        "tsx": "^4.6.0",
+        "typescript": "^5.3.0",
+        "vitest": "^1.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
