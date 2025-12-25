@@ -645,6 +645,11 @@ export class VFSAppointmentFlow {
             } catch { /* ignore */ }
 
             console.log('   ' + '═'.repeat(50));
+
+            // Check the 3 required checkboxes
+            console.log('\n   ☑️ Checking required checkboxes...');
+            await this.checkRequiredCheckboxes();
+
             console.log('\n   🎉 BOOKING READY FOR FINAL CONFIRMATION!');
             console.log('   ⚠️ Manual payment required to complete booking.\n');
 
@@ -652,6 +657,96 @@ export class VFSAppointmentFlow {
         } catch (error) {
             console.log('   ❌ Error extracting review details:', error);
             return details;
+        }
+    }
+
+    /**
+     * Check the 3 required checkboxes on Review page
+     * 
+     * DOM Structure:
+     * - mat-mdc-checkbox-1: "I accept the Terms and Conditions"
+     * - mat-mdc-checkbox-2: "Yes, I agree to receive future communication..."
+     * - mat-mdc-checkbox-3: "Yes, I agree for waitlist confirmation"
+     */
+    private async checkRequiredCheckboxes(): Promise<void> {
+        try {
+            // Checkbox selectors based on user's DOM screenshots
+            const checkboxes = [
+                {
+                    id: 'mat-mdc-checkbox-1',
+                    selector: '#mat-mdc-checkbox-1, mat-checkbox#mat-mdc-checkbox-1, input#mat-mdc-checkbox-1-input',
+                    label: 'Terms and Conditions',
+                },
+                {
+                    id: 'mat-mdc-checkbox-2',
+                    selector: '#mat-mdc-checkbox-2, mat-checkbox#mat-mdc-checkbox-2, input#mat-mdc-checkbox-2-input',
+                    label: 'Marketing communication',
+                },
+                {
+                    id: 'mat-mdc-checkbox-3',
+                    selector: '#mat-mdc-checkbox-3, mat-checkbox#mat-mdc-checkbox-3, input#mat-mdc-checkbox-3-input',
+                    label: 'Waitlist confirmation',
+                },
+            ];
+
+            for (const checkbox of checkboxes) {
+                try {
+                    // Try multiple selectors
+                    const selectors = [
+                        checkbox.selector,
+                        `mat-checkbox[id="${checkbox.id}"]`,
+                        `mat-checkbox[id="${checkbox.id}"] .mdc-checkbox`,
+                        `mat-checkbox[id="${checkbox.id}"] input[type="checkbox"]`,
+                        `input[id="${checkbox.id}-input"]`,
+                        `label[for="${checkbox.id}-input"]`,
+                    ];
+
+                    let clicked = false;
+                    for (const sel of selectors) {
+                        try {
+                            const element = this.page.locator(sel).first();
+                            if (await element.isVisible({ timeout: 2000 })) {
+                                // Check if already checked
+                                const isChecked = await element.isChecked().catch(() => false);
+
+                                if (!isChecked) {
+                                    await element.scrollIntoViewIfNeeded();
+                                    await new Promise(r => setTimeout(r, 300));
+                                    await this.behavior.naturalClick(element);
+                                    console.log(`   ✅ Checked: ${checkbox.label}`);
+                                } else {
+                                    console.log(`   ☑️ Already checked: ${checkbox.label}`);
+                                }
+                                clicked = true;
+                                break;
+                            }
+                        } catch {
+                            continue;
+                        }
+                    }
+
+                    if (!clicked) {
+                        // Force click fallback
+                        const matCheckbox = this.page.locator(`mat-checkbox[id="${checkbox.id}"]`).first();
+                        if (await matCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
+                            await matCheckbox.click({ force: true });
+                            console.log(`   ✅ Force checked: ${checkbox.label}`);
+                        } else {
+                            console.log(`   ⚠️ Could not find: ${checkbox.label}`);
+                        }
+                    }
+
+                    await new Promise(r => setTimeout(r, 500));
+                } catch (e) {
+                    console.log(`   ⚠️ Error checking ${checkbox.label}:`, e);
+                }
+            }
+
+            // Check for captcha after clicking checkboxes
+            await this.checkAndHandleCaptcha();
+
+        } catch (error) {
+            console.log('   ❌ Error checking checkboxes:', error);
         }
     }
 }
