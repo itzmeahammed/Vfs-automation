@@ -868,7 +868,7 @@ export class VFSBookingFlow {
 
     /**
      * Wait for Your Details page to load
-     * URL: https://visa.vfsglobal.com/are/en/mlt/your-details
+     * URL: https://visa.vfsglobal.com/are/en/jpn/your-details
      */
     private async waitForYourDetailsPage(): Promise<boolean> {
         try {

@@ -13,7 +13,7 @@ async function main() {
 
     try {
         const { page } = await identity.launch();
-        const startUrl = 'https://visa.vfsglobal.com/are/en/mlt/login';
+        const startUrl = 'https://visa.vfsglobal.com/are/en/jpn/login';
 
         console.log(`📍 Navigating to Login Page: ${startUrl}`);
         await page.goto(startUrl, { waitUntil: 'domcontentloaded' });

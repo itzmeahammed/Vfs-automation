@@ -38,7 +38,7 @@ export interface LoginFlowConfig {
 }
 
 const DEFAULT_CONFIG: LoginFlowConfig = {
-    loginUrl: 'https://visa.vfsglobal.com/are/en/mlt/login',
+    loginUrl: 'https://visa.vfsglobal.com/are/en/jpn/login',
     maxAttempts: 1, // Single attempt per session (human-like)
     screenshotOnError: true,
 };
@@ -232,7 +232,7 @@ export class VFSLoginFlow {
             // Visit a "safe" page first (e.g., homepage or google)
             // Ideally just the base domain
             const baseUrl = new URL(this.config.loginUrl).origin;
-            await this.page.goto(baseUrl + '/are/en/mlt/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await this.page.goto(baseUrl + '/are/en/jpn/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
             console.log('   Humanizing: Scrolling and looking around...');
             await this.behavior.idleBehavior(2000); // Mouse drift
