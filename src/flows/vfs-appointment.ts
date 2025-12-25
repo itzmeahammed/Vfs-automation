@@ -6,11 +6,11 @@
  * This module handles the /book-appointment page:
  * 1. Navigating months until finding available dates
  * 2. Selecting appointment date (td with class "date-availiable" - note VFS typo!)
- * 3. Selecting available time slot from ba-slot-table
+ * 3. Selecting available time slot from ba-slot-box
  * 4. Clicking Continue to proceed
  */
 
-import { Page, Locator } from 'playwright';
+import { Page } from 'playwright';
 import * as fs from 'fs';
 import {
     HumanTimingEngine,
@@ -19,23 +19,32 @@ import {
 
 export interface AppointmentResult {
     success: boolean;
-    state: 'waiting' | 'date_selected' | 'time_selected' | 'confirmed' | 'failed';
+    state: 'waiting' | 'date_selected' | 'time_selected' | 'services_done' | 'review_done' | 'confirmed' | 'failed';
     message: string;
     appointmentDate?: string;
     appointmentTime?: string;
     screenshot?: string;
+    reviewDetails?: ReviewDetails;
+}
+
+export interface ReviewDetails {
+    applicationId?: string;
+    applicantName?: string;
+    appointmentDate?: string;
+    appointmentTime?: string;
+    appointmentLocation?: string;
+    visaCategory?: string;
+    totalAmount?: string;
 }
 
 /**
  * VFS Malta Appointment Booking Flow
  * 
- * Handles selecting date and time on /book-appointment page
- * 
- * DOM Structure (from user's screenshots):
+ * DOM Structure:
  * - Calendar: full-calendar with fc-daygrid-body
  * - Available dates: td.fc-daygrid-day.date-availiable (VFS uses typo "availiable")
  * - Next month button: button.fc-next-button
- * - Time slots: table.ba-slot-table with "Select" buttons
+ * - Time slots: div.ba-slot-box with input.ba-slot-radio and label.ba-slot-radio-label
  * - Continue button: btn-brand-orange
  */
 export class VFSAppointmentFlow {
@@ -73,15 +82,11 @@ export class VFSAppointmentFlow {
         }
     }
 
-    /**
-     * Check for and handle Cloudflare captcha popup
-     */
     private async checkAndHandleCaptcha(): Promise<boolean> {
         try {
             const captchaSelectors = [
                 'app-cloudflare-dialog',
                 '.mat-mdc-dialog-surface:has-text("Verify Captcha")',
-                '.mat-mdc-dialog-surface:has-text("Success!")',
             ];
 
             for (const selector of captchaSelectors) {
@@ -108,41 +113,29 @@ export class VFSAppointmentFlow {
         }
     }
 
-    /**
-     * Execute the appointment booking flow
-     */
     async execute(): Promise<AppointmentResult> {
         console.log('\n' + '═'.repeat(60));
         console.log('📅 VFS Malta Appointment Booking Flow');
         console.log('═'.repeat(60) + '\n');
 
         try {
-            // Step 1: Wait for Book Appointment page
+            // Step 1: Wait for page
             const pageReady = await this.waitForBookAppointmentPage();
             if (!pageReady) {
                 await this.takeScreenshot('appointment-page-not-ready');
-                return {
-                    success: false,
-                    state: 'failed',
-                    message: 'Book Appointment page not loaded',
-                };
+                return { success: false, state: 'failed', message: 'Book Appointment page not loaded' };
             }
             await this.takeScreenshot('appointment-page-loaded');
 
-            // Step 2: Select appointment date (may need to navigate months)
+            // Step 2: Select date
             console.log('\n📆 Looking for available dates...');
             const dateInfo = await this.selectEarliestDate();
             await this.takeScreenshot('date-selection');
 
             if (!dateInfo) {
-                return {
-                    success: false,
-                    state: 'waiting',
-                    message: 'No available dates found',
-                };
+                return { success: false, state: 'waiting', message: 'No available dates found' };
             }
 
-            // Wait for time slots to appear
             await new Promise(r => setTimeout(r, 3000));
 
             // Step 3: Select time slot
@@ -159,22 +152,52 @@ export class VFSAppointmentFlow {
                 };
             }
 
-            // Check for captcha
             await this.checkAndHandleCaptcha();
 
-            // Step 4: Click Continue button
+            // Step 4: Click Continue (from appointment page)
             console.log('\n➡️ Clicking Continue button...');
             const continued = await this.clickContinueButton();
-            await this.takeScreenshot('after-continue');
+            await this.takeScreenshot('after-appointment-continue');
+
+            if (!continued) {
+                return {
+                    success: true,
+                    state: 'time_selected',
+                    message: `Selected ${dateInfo} ${timeInfo}, but Continue pending`,
+                    appointmentDate: dateInfo,
+                    appointmentTime: timeInfo,
+                };
+            }
+
+            // Step 5: Handle Services page (just click Continue)
+            console.log('\n🛒 Handling Services page...');
+            await new Promise(r => setTimeout(r, 3000));
+            const servicesHandled = await this.handleServicesPage();
+            await this.takeScreenshot('services-page');
+
+            if (!servicesHandled) {
+                return {
+                    success: true,
+                    state: 'services_done',
+                    message: `Appointment selected but stuck on Services page`,
+                    appointmentDate: dateInfo,
+                    appointmentTime: timeInfo,
+                };
+            }
+
+            // Step 6: Handle Review page (log all details)
+            console.log('\n📋 Handling Review page...');
+            await new Promise(r => setTimeout(r, 3000));
+            const reviewDetails = await this.handleReviewPage();
+            await this.takeScreenshot('review-page');
 
             return {
                 success: true,
-                state: continued ? 'confirmed' : 'time_selected',
-                message: continued
-                    ? `Appointment selected: ${dateInfo} at ${timeInfo}`
-                    : `Selected ${dateInfo} ${timeInfo}, but Continue pending`,
+                state: 'review_done',
+                message: `Booking ready for final confirmation! ${dateInfo} at ${timeInfo}`,
                 appointmentDate: dateInfo,
                 appointmentTime: timeInfo,
+                reviewDetails: reviewDetails,
             };
 
         } catch (error) {
@@ -188,9 +211,6 @@ export class VFSAppointmentFlow {
         }
     }
 
-    /**
-     * Wait for Book Appointment page to be ready
-     */
     private async waitForBookAppointmentPage(): Promise<boolean> {
         console.log('📋 Checking Book Appointment page...');
 
@@ -203,14 +223,7 @@ export class VFSAppointmentFlow {
                 return false;
             }
 
-            // Wait for calendar
-            const calendarSelectors = [
-                '.ba-calender-card',
-                '.full-calendar',
-                'full-calendar',
-                '.fc-daygrid-body',
-                'h2:has-text("Pick an appointment date")',
-            ];
+            const calendarSelectors = ['.ba-calender-card', '.fc-daygrid-body', 'h2:has-text("Pick an appointment date")'];
 
             for (const selector of calendarSelectors) {
                 try {
@@ -224,7 +237,7 @@ export class VFSAppointmentFlow {
             }
 
             const pageText = await this.page.textContent('body').catch(() => '');
-            if (pageText?.includes('Book an Appointment') || pageText?.includes('Pick an appointment date')) {
+            if (pageText?.includes('Book an Appointment')) {
                 console.log('   ✅ Book Appointment page detected by content');
                 await new Promise(r => setTimeout(r, 2000));
                 return true;
@@ -238,15 +251,6 @@ export class VFSAppointmentFlow {
         }
     }
 
-    /**
-     * Select the earliest available date from the calendar
-     * 
-     * Logic:
-     * 1. Check current month for available dates (td.date-availiable)
-     * 2. If none found, click next month button (fc-next-button)
-     * 3. Repeat until available date found or max months reached
-     * 4. Click on first available date
-     */
     private async selectEarliestDate(): Promise<string | null> {
         const maxMonthAttempts = 6;
 
@@ -254,61 +258,48 @@ export class VFSAppointmentFlow {
             try {
                 await new Promise(r => setTimeout(r, 2000));
 
-                // Get current month for logging
                 const monthHeader = await this.page.locator('.fc-toolbar-title, h2').first().textContent().catch(() => 'Unknown');
                 console.log(`\n   📅 Checking month: ${monthHeader?.trim()}`);
                 await this.takeScreenshot(`month-${monthAttempt + 1}`);
 
                 // Find available dates - VFS uses "date-availiable" class (with typo!)
                 const availableDates = await this.page.locator('td.fc-daygrid-day.date-availiable, td.date-availiable').all();
-                console.log(`   🔍 Found ${availableDates.length} available dates in ${monthHeader?.trim()}`);
+                console.log(`   🔍 Found ${availableDates.length} available dates`);
 
                 if (availableDates.length > 0) {
-                    // Get the first available date
                     const firstAvailable = availableDates[0];
-
-                    // Get date info
                     const dateNumber = await firstAvailable.locator('.fc-daygrid-day-number, a').first().textContent().catch(() => '');
                     const dataDate = await firstAvailable.getAttribute('data-date').catch(() => '');
 
                     console.log(`   🎯 First available date: ${dateNumber?.trim()} (${dataDate})`);
 
-                    // Scroll and click
                     await firstAvailable.scrollIntoViewIfNeeded();
                     await new Promise(r => setTimeout(r, 500));
-
                     await this.behavior.naturalClick(firstAvailable);
                     console.log(`   ✅ Clicked available date: ${dateNumber?.trim()}`);
 
                     await new Promise(r => setTimeout(r, 2000));
 
-                    // Verify time slots appeared
-                    const timeSlotsVisible = await this.page.locator('table.ba-slot-table, h2:has-text("Choose an appointment time")').isVisible({ timeout: 5000 }).catch(() => false);
+                    const timeSlotsVisible = await this.page.locator('div.ba-slot-box, table.ba-slot-table, h2:has-text("Choose an appointment time")').isVisible({ timeout: 5000 }).catch(() => false);
 
                     if (timeSlotsVisible) {
                         console.log(`   ✅ Time slots appeared!`);
                         return dataDate || dateNumber?.trim() || 'Available date';
                     } else {
-                        console.log(`   ⚠️ Time slots not visible, trying next available date...`);
-
-                        // Try second available date if exists
+                        console.log(`   ⚠️ Time slots not visible, trying next...`);
                         if (availableDates.length > 1) {
                             const secondAvailable = availableDates[1];
-                            const date2Num = await secondAvailable.locator('.fc-daygrid-day-number, a').first().textContent().catch(() => '');
                             const date2 = await secondAvailable.getAttribute('data-date');
-
                             await secondAvailable.scrollIntoViewIfNeeded();
                             await this.behavior.naturalClick(secondAvailable);
-                            console.log(`   ✅ Clicked second available date: ${date2Num?.trim()}`);
+                            console.log(`   ✅ Clicked second available date: ${date2}`);
                             await new Promise(r => setTimeout(r, 2000));
-                            return date2 || date2Num?.trim() || 'Available date';
+                            return date2 || 'Available date';
                         }
                     }
                 }
 
-                // No available dates in this month - navigate to next month
                 console.log('   ➡️ No available dates in this month, going to next...');
-
                 const nextMonthClicked = await this.clickNextMonth();
                 if (!nextMonthClicked) {
                     console.log('   ❌ Could not navigate to next month');
@@ -325,18 +316,12 @@ export class VFSAppointmentFlow {
         return null;
     }
 
-    /**
-     * Click the next month arrow button
-     * DOM: button.fc-next-button with title="Next month"
-     */
     private async clickNextMonth(): Promise<boolean> {
         try {
             const nextButtonSelectors = [
                 'button.fc-next-button',
                 'button[title="Next month"]',
-                'button[aria-label="next month"]',
                 'button:has(.fc-icon-chevron-right)',
-                '.fc-button-group button:last-child',
             ];
 
             for (const selector of nextButtonSelectors) {
@@ -345,10 +330,7 @@ export class VFSAppointmentFlow {
 
                     if (await nextBtn.isVisible({ timeout: 2000 })) {
                         const isDisabled = await nextBtn.isDisabled().catch(() => false);
-                        if (isDisabled) {
-                            console.log(`   ⚠️ Next month button is disabled`);
-                            continue;
-                        }
+                        if (isDisabled) continue;
 
                         await this.behavior.naturalClick(nextBtn);
                         console.log('   ➡️ Clicked next month button');
@@ -360,8 +342,7 @@ export class VFSAppointmentFlow {
                 }
             }
 
-            // Force click fallback
-            const anyNextBtn = this.page.locator('button.fc-next-button, button[title*="Next"]').first();
+            const anyNextBtn = this.page.locator('button.fc-next-button').first();
             if (await anyNextBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await anyNextBtn.click({ force: true });
                 console.log('   ➡️ Force clicked next month');
@@ -379,50 +360,59 @@ export class VFSAppointmentFlow {
 
     /**
      * Select the earliest available time slot
-     * DOM: table.ba-slot-table with "Select" buttons for each time slot
+     * 
+     * DOM Structure:
+     * - tr with td.align-middle containing time (e.g. "09:00")
+     * - div.ba-slot-box with input.ba-slot-radio
+     * - label.ba-slot-radio-label containing div.ba-slot-radio-label-text1 "Select"
      */
     private async selectEarliestTimeSlot(): Promise<string | null> {
         try {
             await new Promise(r => setTimeout(r, 2000));
 
-            console.log('   🔍 Looking for time slot table...');
+            console.log('   🔍 Looking for time slot...');
 
-            const tableVisible = await this.page.locator('table.ba-slot-table, .ba-slot-table').isVisible({ timeout: 5000 }).catch(() => false);
+            // Scroll to make time slots visible
+            await this.page.evaluate(() => window.scrollBy(0, 500));
+            await new Promise(r => setTimeout(r, 1000));
 
-            if (!tableVisible) {
-                console.log('   ⚠️ Time slot table not visible');
-                return null;
-            }
-
-            // Find Select buttons
-            const selectButtonSelectors = [
-                'table.ba-slot-table button:has-text("Select")',
-                '.ba-slot-table button:has-text("Select")',
-                'tr:has(td) button:has-text("Select")',
+            // From user's DOM: div.ba-slot-box is the clickable container
+            const slotSelectors = [
+                'div.ba-slot-box',
+                'label.ba-slot-radio-label',
+                'div.ba-slot-radio-label-text1:has-text("Select")',
+                'input.ba-slot-radio',
             ];
 
-            for (const selector of selectButtonSelectors) {
+            for (const selector of slotSelectors) {
                 try {
-                    const buttons = await this.page.locator(selector).all();
-                    console.log(`   📋 Found ${buttons.length} Select buttons with: ${selector}`);
+                    const slots = await this.page.locator(selector).all();
+                    console.log(`   📋 Found ${slots.length} slots with: ${selector}`);
 
-                    if (buttons.length > 0) {
-                        const firstButton = buttons[0];
+                    if (slots.length > 0) {
+                        const firstSlot = slots[0];
 
-                        if (await firstButton.isVisible()) {
-                            // Get time from the row
-                            const row = this.page.locator(`tr:has(button:has-text("Select"))`).first();
-                            const timeCell = row.locator('td.align-middle, td:first-child').first();
-                            const timeText = await timeCell.textContent().catch(() => 'Unknown time');
+                        if (await firstSlot.isVisible()) {
+                            // Get the time from td.align-middle
+                            const timeCell = await this.page.locator('td.align-middle').first().textContent().catch(() => '');
+                            console.log(`   🕐 Time found: ${timeCell?.trim()}`);
 
-                            await firstButton.scrollIntoViewIfNeeded();
+                            await firstSlot.scrollIntoViewIfNeeded();
                             await new Promise(r => setTimeout(r, 300));
 
-                            await this.behavior.naturalClick(firstButton);
-                            console.log(`   ✅ Clicked Select for time: ${timeText?.trim()}`);
+                            await this.behavior.naturalClick(firstSlot);
+                            console.log(`   ✅ Clicked time slot: ${timeCell?.trim() || selector}`);
 
                             await new Promise(r => setTimeout(r, 2000));
-                            return timeText?.trim() || 'Selected';
+
+                            // Verify selection
+                            const selected = await this.page.locator('div.ba-slot-radio-label-text2:has-text("Selected"), input.ba-slot-radio:checked').isVisible({ timeout: 2000 }).catch(() => false);
+
+                            if (selected) {
+                                console.log(`   ✅ Time slot verified!`);
+                            }
+
+                            return timeCell?.trim() || 'Selected';
                         }
                     }
                 } catch (e) {
@@ -431,13 +421,15 @@ export class VFSAppointmentFlow {
                 }
             }
 
-            // Fallback
-            const anySelectBtn = this.page.locator('button:has-text("Select")').first();
-            if (await anySelectBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                await anySelectBtn.click({ force: true });
-                console.log('   ✅ Force clicked first Select button');
+            // Force click fallback
+            console.log('   🔄 Trying force click...');
+            const anySlot = this.page.locator('div.ba-slot-box, label.ba-slot-radio-label').first();
+            if (await anySlot.isVisible({ timeout: 3000 }).catch(() => false)) {
+                const timeCell = await this.page.locator('td.align-middle').first().textContent().catch(() => '');
+                await anySlot.click({ force: true });
+                console.log(`   ✅ Force clicked: ${timeCell?.trim()}`);
                 await new Promise(r => setTimeout(r, 2000));
-                return 'Selected';
+                return timeCell?.trim() || 'Selected';
             }
 
             console.log('   ❌ No time slots found');
@@ -448,9 +440,6 @@ export class VFSAppointmentFlow {
         }
     }
 
-    /**
-     * Click the Continue button to proceed
-     */
     private async clickContinueButton(): Promise<boolean> {
         try {
             console.log('   🔍 Looking for Continue button...');
@@ -459,7 +448,6 @@ export class VFSAppointmentFlow {
                 'button.btn-brand-orange:has(span.mdc-button__label:has-text("Continue"))',
                 'button.btn-brand-orange.btn-block:has-text("Continue")',
                 'button.btn-brand-orange:has-text("Continue")',
-                'button:has(span.mdc-button__label:has-text("Continue"))',
                 'button:has-text("Continue"):not(:has-text("Go Back"))',
             ];
 
@@ -489,7 +477,6 @@ export class VFSAppointmentFlow {
                 }
             }
 
-            // Force click fallback
             const anyButton = this.page.locator('button:has-text("Continue")').first();
             if (await anyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
                 const isDisabled = await anyButton.isDisabled().catch(() => false);
@@ -506,6 +493,165 @@ export class VFSAppointmentFlow {
         } catch (error) {
             console.log('   ❌ Error clicking Continue:', error);
             return false;
+        }
+    }
+
+    /**
+     * Handle Services page - just click Continue (no services selected)
+     * DOM: button.btn-brand-orange with Continue text
+     */
+    private async handleServicesPage(): Promise<boolean> {
+        try {
+            // Wait for Services page to load
+            const url = this.page.url();
+            console.log(`   📍 Current URL: ${url}`);
+
+            // Check if we're on the services page
+            const servicesHeader = await this.page.locator('h1:has-text("Services"), h2:has-text("Services")').isVisible({ timeout: 5000 }).catch(() => false);
+
+            if (!servicesHeader) {
+                console.log('   ⚠️ Services page header not found');
+                // Maybe we're already on Review page?
+                const reviewHeader = await this.page.locator('h1:has-text("Review"), h2:has-text("Review")').isVisible({ timeout: 2000 }).catch(() => false);
+                if (reviewHeader) {
+                    console.log('   ✅ Already on Review page, skipping Services');
+                    return true;
+                }
+            }
+
+            console.log('   📋 Services page detected');
+            console.log('   ℹ️ Skipping optional services, clicking Continue...');
+
+            // Check for captcha
+            await this.checkAndHandleCaptcha();
+
+            // Click Continue button
+            const continueClicked = await this.clickContinueButton();
+
+            if (continueClicked) {
+                console.log('   ✅ Passed Services page');
+                await new Promise(r => setTimeout(r, 2000));
+                return true;
+            }
+
+            console.log('   ⚠️ Could not click Continue on Services');
+            return false;
+        } catch (error) {
+            console.log('   ❌ Error on Services page:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Handle Review page - extract and log all booking details
+     */
+    private async handleReviewPage(): Promise<ReviewDetails> {
+        const details: ReviewDetails = {};
+
+        try {
+            // Wait for Review page
+            const url = this.page.url();
+            console.log(`   📍 Current URL: ${url}`);
+
+            // Check for Review page
+            const reviewHeader = await this.page.locator('h1:has-text("Review"), h2:has-text("Review")').isVisible({ timeout: 5000 }).catch(() => false);
+
+            if (!reviewHeader) {
+                console.log('   ⚠️ Review page not found');
+                return details;
+            }
+
+            console.log('\n   ' + '═'.repeat(50));
+            console.log('   📋 BOOKING REVIEW DETAILS');
+            console.log('   ' + '═'.repeat(50));
+
+            // Extract Application ID
+            try {
+                const appIdElement = await this.page.locator('text=/MAL[0-9]+/').first().textContent();
+                if (appIdElement) {
+                    details.applicationId = appIdElement.trim();
+                    console.log(`   🆔 Application ID: ${details.applicationId}`);
+                }
+            } catch { /* ignore */ }
+
+            // Extract Applicant Name
+            try {
+                const nameSelectors = [
+                    '.applicant-name',
+                    'td:has-text("Name") + td',
+                    'div:has-text("Applicant") + div',
+                ];
+                for (const sel of nameSelectors) {
+                    const name = await this.page.locator(sel).first().textContent().catch(() => '');
+                    if (name && name.length > 2) {
+                        details.applicantName = name.trim();
+                        console.log(`   👤 Applicant: ${details.applicantName}`);
+                        break;
+                    }
+                }
+            } catch { /* ignore */ }
+
+            // Extract Appointment Date
+            try {
+                const dateText = await this.page.locator('text=/[0-9]{2}-[0-9]{2}-[0-9]{4}/, text=/[0-9]{4}-[0-9]{2}-[0-9]{2}/').first().textContent();
+                if (dateText) {
+                    details.appointmentDate = dateText.trim();
+                    console.log(`   📅 Date: ${details.appointmentDate}`);
+                }
+            } catch { /* ignore */ }
+
+            // Extract Appointment Time
+            try {
+                const timeText = await this.page.locator('text=/[0-9]{2}:[0-9]{2}/').first().textContent();
+                if (timeText) {
+                    details.appointmentTime = timeText.trim();
+                    console.log(`   ⏰ Time: ${details.appointmentTime}`);
+                }
+            } catch { /* ignore */ }
+
+            // Extract Location
+            try {
+                const locSelectors = [
+                    'text=/VFS Global.*Centre/i',
+                    'td:has-text("Centre") + td',
+                    'div:has-text("Location") + div',
+                ];
+                for (const sel of locSelectors) {
+                    const loc = await this.page.locator(sel).first().textContent().catch(() => '');
+                    if (loc && loc.length > 5) {
+                        details.appointmentLocation = loc.trim();
+                        console.log(`   📍 Location: ${details.appointmentLocation}`);
+                        break;
+                    }
+                }
+            } catch { /* ignore */ }
+
+            // Extract Visa Category
+            try {
+                const catText = await this.page.locator('text=/Malta/i, text=/Schengen/i').first().textContent();
+                if (catText) {
+                    details.visaCategory = catText.trim();
+                    console.log(`   🛂 Category: ${details.visaCategory}`);
+                }
+            } catch { /* ignore */ }
+
+            // Extract Total Amount
+            try {
+                const amountText = await this.page.locator('text=/AED [0-9.]+/, text=/Total.*AED/i').first().textContent();
+                if (amountText) {
+                    details.totalAmount = amountText.trim();
+                    console.log(`   💰 Total: ${details.totalAmount}`);
+                }
+            } catch { /* ignore */ }
+
+            console.log('   ' + '═'.repeat(50));
+            console.log('\n   🎉 BOOKING READY FOR FINAL CONFIRMATION!');
+            console.log('   ⚠️ Manual payment required to complete booking.\n');
+
+            return details;
+        } catch (error) {
+            console.log('   ❌ Error extracting review details:', error);
+            return details;
         }
     }
 }
