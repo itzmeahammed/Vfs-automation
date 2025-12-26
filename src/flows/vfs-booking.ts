@@ -1254,8 +1254,10 @@ export class VFSBookingFlow {
                 }
 
                 if (!dropdownClicked) {
-                    console.log('   ⚠️ Could not find nationality dropdown');
-                    await delay(300);
+                    console.log('   ⚠️ Could not find nationality dropdown, clicking outside to reset...');
+                    // Click outside to close any open overlay/dropdown
+                    await this.page.click('body', { position: { x: 100, y: 100 } });
+                    await delay(500);
                     continue;
                 }
 
@@ -1616,19 +1618,43 @@ export class VFSBookingFlow {
     /**
      * Wait for Book Appointment page to load
      * URL: /book-appointment
+     * If still on summary page, retry clicking Continue
      */
     async waitForBookAppointmentPage(): Promise<boolean> {
         console.log('\n📅 Waiting for Book Appointment page...');
 
         try {
-            await this.page.waitForURL('**/book-appointment', { timeout: 30000 });
+            // First check current URL
+            let currentUrl = this.page.url();
+
+            // If still on summary, try clicking Continue again (popup may have appeared)
+            if (currentUrl.includes('/summary')) {
+                console.log('   ⚠️ Still on Summary page, trying Continue again...');
+
+                const continueBtn = this.page.locator('button:has-text("Continue")').first();
+                if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await continueBtn.click({ force: true });
+                    console.log('   ✅ Clicked Continue again');
+                    await delay(2000);
+                }
+            }
+
+            // Wait for book-appointment URL
+            await this.page.waitForURL('**/book-appointment', { timeout: 20000 });
             console.log('   ✅ Book Appointment page loaded');
 
             // Wait for content
-            await delay(2000);
+            await delay(1000);
 
             return true;
         } catch (error) {
+            // Final check - maybe we're on appointment page now
+            const finalUrl = this.page.url();
+            if (finalUrl.includes('/book-appointment')) {
+                console.log('   ✅ Book Appointment page loaded (verified by URL)');
+                return true;
+            }
+
             console.log('   ❌ Book Appointment page not loaded:', error);
             return false;
         }
