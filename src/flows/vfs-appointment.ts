@@ -275,10 +275,14 @@ export class VFSAppointmentFlow {
                     console.log(`   🎯 First available date: ${dateNumber?.trim()} (${dataDate})`);
 
                     await firstAvailable.scrollIntoViewIfNeeded();
-                    await delay(2000);
+                    await delay(1000);
                     await this.behavior.naturalClick(firstAvailable);
                     console.log(`   ✅ Clicked available date: ${dateNumber?.trim()}`);
 
+                    await delay(2000);
+
+                    // Check for captcha before looking for time slots
+                    await this.checkAndHandleCaptcha();
                     await delay(2000);
 
                     const timeSlotsVisible = await this.page.locator('div.ba-slot-box, table.ba-slot-table, h2:has-text("Choose an appointment time")').isVisible({ timeout: 5000 }).catch(() => false);
@@ -294,7 +298,9 @@ export class VFSAppointmentFlow {
                             await secondAvailable.scrollIntoViewIfNeeded();
                             await this.behavior.naturalClick(secondAvailable);
                             console.log(`   ✅ Clicked second available date: ${date2}`);
-                            await delay(2000);
+                            await delay(1500);
+                            await this.checkAndHandleCaptcha();
+                            await delay(1500);
                             return date2 || 'Available date';
                         }
                     }
