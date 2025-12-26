@@ -1618,44 +1618,70 @@ export class VFSBookingFlow {
     /**
      * Wait for Book Appointment page to load
      * URL: /book-appointment
-     * If still on summary page, retry clicking Continue
+     * Sometimes there are 2 Continue buttons to click (popup case)
      */
     async waitForBookAppointmentPage(): Promise<boolean> {
         console.log('\n📅 Waiting for Book Appointment page...');
 
         try {
-            // First check current URL
-            let currentUrl = this.page.url();
+            // Click Continue buttons - there may be 2 (popup case)
+            for (let clickAttempt = 1; clickAttempt <= 2; clickAttempt++) {
+                const currentUrl = this.page.url();
 
-            // If still on summary, try clicking Continue again (popup may have appeared)
-            if (currentUrl.includes('/summary')) {
-                console.log('   ⚠️ Still on Summary page, trying Continue again...');
+                // If already on appointment page, we're done
+                if (currentUrl.includes('/book-appointment')) {
+                    console.log('   ✅ Book Appointment page loaded');
+                    return true;
+                }
 
-                const continueBtn = this.page.locator('button:has-text("Continue")').first();
-                if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await continueBtn.click({ force: true });
-                    console.log('   ✅ Clicked Continue again');
-                    await delay(2000);
+                // If still on summary, click Continue
+                if (currentUrl.includes('/summary')) {
+                    console.log(`   🔄 Still on Summary (attempt ${clickAttempt}/2), clicking Continue...`);
+
+                    const continueBtn = this.page.locator('button:has-text("Continue")').first();
+                    if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+                        await continueBtn.click({ force: true });
+                        console.log('   ✅ Clicked Continue');
+
+                        // Wait for navigation
+                        await delay(3000);
+                    } else {
+                        console.log('   ⚠️ Continue button not visible');
+                        await delay(2000);
+                    }
                 }
             }
 
-            // Wait for book-appointment URL
-            await this.page.waitForURL('**/book-appointment', { timeout: 20000 });
-            console.log('   ✅ Book Appointment page loaded');
-
-            // Wait for content
-            await delay(1000);
-
-            return true;
-        } catch (error) {
-            // Final check - maybe we're on appointment page now
+            // Final wait and URL check
+            await delay(5000);
             const finalUrl = this.page.url();
+
             if (finalUrl.includes('/book-appointment')) {
                 console.log('   ✅ Book Appointment page loaded (verified by URL)');
                 return true;
             }
 
-            console.log('   ❌ Book Appointment page not loaded:', error);
+            // If still on summary, try one more time
+            if (finalUrl.includes('/summary')) {
+                console.log('   🔄 Still on Summary after 2 attempts, trying force click...');
+                const anyButton = this.page.locator('button:has-text("Continue")').first();
+                if (await anyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await anyButton.click({ force: true });
+                    await delay(3000);
+                }
+
+                // Check URL one more time
+                const verifyUrl = this.page.url();
+                if (verifyUrl.includes('/book-appointment')) {
+                    console.log('   ✅ Book Appointment page loaded (after retry)');
+                    return true;
+                }
+            }
+
+            console.log(`   ❌ Could not navigate to Book Appointment page. Current URL: ${finalUrl}`);
+            return false;
+        } catch (error) {
+            console.log('   ❌ Error waiting for Book Appointment page:', error);
             return false;
         }
     }
