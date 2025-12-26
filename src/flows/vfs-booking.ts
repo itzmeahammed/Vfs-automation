@@ -1242,7 +1242,7 @@ export class VFSBookingFlow {
                             dropdown = d;
                             // Click multiple times to ensure it opens
                             await this.behavior.naturalClick(d);
-                            await delay(2000);
+                            await delay(300);
                             await d.click(); // Direct click as backup
                             dropdownClicked = true;
                             console.log(`   ✅ Clicked dropdown: ${selector}`);
@@ -1255,12 +1255,12 @@ export class VFSBookingFlow {
 
                 if (!dropdownClicked) {
                     console.log('   ⚠️ Could not find nationality dropdown');
-                    await delay(2000);
+                    await delay(300);
                     continue;
                 }
 
                 // Wait for panel to open
-                await delay(2000);
+                await delay(500);
 
                 // Check if panel is visible
                 const panelVisible = await this.page.locator('#mat-select-3-panel mat-option, .cdk-overlay-container mat-option').first().isVisible({ timeout: 3000 }).catch(() => false);
@@ -1269,7 +1269,7 @@ export class VFSBookingFlow {
                     console.log('   ⚠️ Panel not visible, clicking dropdown again...');
                     if (dropdown) {
                         await dropdown.click({ force: true });
-                        await delay(2000);
+                        await delay(300);
                     }
                 }
 
@@ -1281,7 +1281,7 @@ export class VFSBookingFlow {
                 if (await exactOption.isVisible({ timeout: 1500 }).catch(() => false)) {
                     await exactOption.click();
                     console.log(`   ✅ Clicked exact match option`);
-                    await delay(2000);
+                    await delay(300);
 
                     // Verify selection
                     if (await this.verifyNationalitySelected(nationalityUpper)) {
@@ -1294,7 +1294,7 @@ export class VFSBookingFlow {
                 if (await containsOption.isVisible({ timeout: 1500 }).catch(() => false)) {
                     await containsOption.click();
                     console.log(`   ✅ Clicked contains match option`);
-                    await delay(2000);
+                    await delay(300);
 
                     if (await this.verifyNationalitySelected(nationalityUpper)) {
                         return true;
@@ -1355,7 +1355,7 @@ export class VFSBookingFlow {
      */
     private async verifyNationalitySelected(expectedNationality: string): Promise<boolean> {
         try {
-            await delay(2000);
+            await delay(300);
 
             // Check the displayed value in the mat-select
             const valueSelectors = [
@@ -1570,11 +1570,24 @@ export class VFSBookingFlow {
                         console.log('   ✅ Clicked Continue');
 
                         // Wait and check for captcha
-                        await delay(2000);
+                        await delay(1000);
                         await this.checkAndHandleCaptcha();
 
-                        // Wait for navigation to Book Appointment page
-                        await delay(2000);
+                        // Check if URL changed - if not, a popup may have appeared, click Continue again
+                        const currentUrl = this.page.url();
+                        if (currentUrl.includes('/summary')) {
+                            console.log('   ⚠️ Still on Summary page, checking for popup/confirmation dialog...');
+                            await delay(500);
+
+                            // Try clicking Continue again (popup case)
+                            const popupContinue = this.page.locator('button:has-text("Continue"), .mat-dialog-content button:has-text("Continue")').first();
+                            if (await popupContinue.isVisible({ timeout: 2000 }).catch(() => false)) {
+                                await popupContinue.click({ force: true });
+                                console.log('   ✅ Clicked Continue on popup');
+                                await delay(1000);
+                            }
+                        }
+
                         return true;
                     }
                 } catch {
