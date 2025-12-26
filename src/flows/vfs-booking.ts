@@ -759,7 +759,48 @@ export class VFSBookingFlow {
         console.log('   ⏳ Waiting for slot information to appear...');
 
         try {
-            // Wait for the slot info to render (Angular may take time)
+            // IMPORTANT: Wait for the loader/spinner to disappear first
+            // The page shows a loading animation while fetching slot data
+            console.log('   ⏳ Waiting for loader to finish...');
+
+            const loaderSelectors = [
+                '.loader',           // Generic loader
+                '.loading',          // Loading class
+                '.mat-spinner',      // Angular Material spinner
+                '.mat-progress-spinner',
+                '[class*="loader"]',
+                '[class*="loading"]',
+                '[class*="spinner"]',
+            ];
+
+            // Wait up to 15 seconds for loader to disappear
+            for (let i = 0; i < 15; i++) {
+                let loaderVisible = false;
+
+                for (const selector of loaderSelectors) {
+                    try {
+                        const loader = this.page.locator(selector).first();
+                        if (await loader.isVisible({ timeout: 500 })) {
+                            loaderVisible = true;
+                            break;
+                        }
+                    } catch {
+                        continue;
+                    }
+                }
+
+                if (!loaderVisible) {
+                    console.log('   ✅ Loader finished');
+                    break;
+                }
+
+                // Wait 1 second before checking again
+                await delay(1000);
+                process.stdout.write('.');
+            }
+            console.log(''); // New line after dots
+
+            // Extra wait for Angular to render the data
             await delay(2000);
 
             // Look for the slot text
