@@ -1238,12 +1238,10 @@ export class VFSBookingFlow {
                 for (const selector of dropdownSelectors) {
                     try {
                         const d = this.page.locator(selector).first();
-                        if (await d.isVisible({ timeout: 1500 })) {
+                        if (await d.isVisible({ timeout: 1000 })) {
                             dropdown = d;
-                            // Click multiple times to ensure it opens
-                            await this.behavior.naturalClick(d);
-                            await delay(300);
-                            await d.click(); // Direct click as backup
+                            // Direct click only (no naturalClick - causes scrolling)
+                            await d.click({ force: true });
                             dropdownClicked = true;
                             console.log(`   ✅ Clicked dropdown: ${selector}`);
                             break;
@@ -1567,26 +1565,17 @@ export class VFSBookingFlow {
                         await button.scrollIntoViewIfNeeded();
                         await delay(2000);
 
-                        // Try natural click first
-                        await this.behavior.naturalClick(button);
-                        console.log('   ✅ Clicked Continue');
-
-                        // Wait and check for captcha
-                        await delay(1000);
-                        await this.checkAndHandleCaptcha();
-
-                        // Check if URL changed - if not, a popup may have appeared, click Continue again
-                        const currentUrl = this.page.url();
-                        if (currentUrl.includes('/summary')) {
-                            console.log('   ⚠️ Still on Summary page, checking for popup/confirmation dialog...');
-                            await delay(500);
-
-                            // Try clicking Continue again (popup case)
-                            const popupContinue = this.page.locator('button:has-text("Continue"), .mat-dialog-content button:has-text("Continue")').first();
-                            if (await popupContinue.isVisible({ timeout: 2000 }).catch(() => false)) {
-                                await popupContinue.click({ force: true });
-                                console.log('   ✅ Clicked Continue on popup');
-                                await delay(1000);
+                        // Click Continue button 3 times (handles popup case)
+                        for (let clickNum = 1; clickNum <= 3; clickNum++) {
+                            try {
+                                const btn = this.page.locator('button:has-text("Continue")').first();
+                                if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
+                                    await btn.click({ force: true });
+                                    console.log(`   ✅ Clicked Continue (${clickNum}/3)`);
+                                    await delay(1000);
+                                }
+                            } catch {
+                                break;
                             }
                         }
 
