@@ -264,8 +264,11 @@ export class VFSBookingFlow {
             await wait('angularRender');
             console.log('   ✅ Category auto-selected');
 
-            // Step 6: Wait for Sub-category dropdown & select
-            await wait('angularRender');
+            // Step 6: Wait for loader to disappear before sub-category selection
+            console.log('   ⏳ Waiting for loader after category selection...');
+            await this.waitForLoaderToDisappear();
+
+            // Wait for Sub-category dropdown & select
             const subCategorySelected = await this.selectSubCategory();
             if (!subCategorySelected) {
                 await this.takeScreenshot('subcategory-selection-failed');
@@ -527,6 +530,53 @@ export class VFSBookingFlow {
             console.log('   ❌ Click failed:', error);
             return false;
         }
+    }
+
+    /**
+     * Wait for any loader/spinner to disappear
+     * VFS shows loading spinners when fetching data after selections
+     */
+    private async waitForLoaderToDisappear(): Promise<void> {
+        const loaderSelectors = [
+            '.mat-spinner',
+            '.mat-progress-spinner',
+            '.loader',
+            '.loading',
+            '[class*="spinner"]',
+            '[class*="loader"]',
+            '[class*="loading"]',
+        ];
+
+        // Wait up to 10 seconds for loader to disappear
+        for (let i = 0; i < 20; i++) {
+            let loaderVisible = false;
+
+            for (const selector of loaderSelectors) {
+                try {
+                    const loader = this.page.locator(selector).first();
+                    if (await loader.isVisible({ timeout: 300 })) {
+                        loaderVisible = true;
+                        break;
+                    }
+                } catch {
+                    continue;
+                }
+            }
+
+            if (!loaderVisible) {
+                console.log('   ✅ Loader finished');
+                // Extra small wait for Angular to render
+                await delay(500);
+                return;
+            }
+
+            // Wait 500ms before checking again
+            await delay(500);
+            process.stdout.write('.');
+        }
+
+        console.log(''); // New line
+        console.log('   ⚠️ Loader wait timed out, continuing anyway...');
     }
 
     /**

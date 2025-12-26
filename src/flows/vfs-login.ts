@@ -599,9 +599,8 @@ export class VFSLoginFlow {
     private async handleCloudfareTurnstile(): Promise<boolean> {
         console.log('      🔍 Scanning for Turnstile widget...');
 
-        // WAIT: Allow time for slow Turnstile rendering (user request)
-        console.log('      ⏳ Waiting 5s for Turnstile to render fully...');
-        await delay(2000);
+        // Quick wait for Turnstile to render (reduced from 5s)
+        await delay(1000);
 
         // First, let's see what iframes exist on the page
         const iframeInfo = await this.page.evaluate(() => {
