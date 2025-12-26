@@ -20,6 +20,12 @@ import { VFSLoginFlow } from './flows/vfs-login.js';
 import { VFSBookingFlow } from './flows/vfs-booking.js';
 import { VFSAppointmentFlow } from './flows/vfs-appointment.js';
 import { EnvironmentMonitor } from './core/environment-monitor.js';
+import { setTimingMode, getTimingMode, type TimingMode } from './config/timing-config.js';
+
+// Set timing mode from environment variable (default: balanced)
+const timingMode = (process.env.TIMING_MODE || 'balanced') as TimingMode;
+setTimingMode(timingMode);
+console.log(`\n⏱️ Running in ${timingMode.toUpperCase()} mode`);
 
 /**
  * Configuration from environment or defaults

@@ -17,6 +17,7 @@ import {
     EnvironmentMonitor,
     type StateIndicators,
 } from '../core/index.js';
+import { delay } from '../config/timing-config.js';
 
 export interface LoginCredentials {
     email: string;
@@ -105,7 +106,7 @@ export class VFSLoginFlow {
                     console.log(`\n🔄 Retry attempt ${attempt}/2 due to session issue check...`);
                     // Refresh page to reset session
                     await this.page.reload({ waitUntil: 'domcontentloaded' });
-                    await new Promise(r => setTimeout(r, 2000));
+                    await delay(2000);
                 }
 
                 loginResult = await this.performLogin(credentials);
@@ -190,7 +191,7 @@ export class VFSLoginFlow {
             }
 
             // Extra wait for any remaining JavaScript execution
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             // Log current URL for debugging
             const currentUrl = this.page.url();
@@ -237,9 +238,9 @@ export class VFSLoginFlow {
             console.log('   Humanizing: Scrolling and looking around...');
             await this.behavior.idleBehavior(2000); // Mouse drift
             await this.behavior.naturalScroll('down', 'medium');
-            await new Promise(r => setTimeout(r, 1500));
+            await delay(2000);
             await this.behavior.naturalScroll('up', 'small');
-            await new Promise(r => setTimeout(r, 1000));
+            await delay(2000);
 
             console.log('   ✅ Warm-up complete');
         } catch (e) {
@@ -362,7 +363,7 @@ export class VFSLoginFlow {
                 // Wait up to 15 seconds for verification to complete
                 let verified = false;
                 for (let i = 0; i < 15; i++) {
-                    await new Promise(r => setTimeout(r, 1000));
+                    await delay(2000);
                     process.stdout.write('.');
 
                     // Check if Sign In button is enabled (indicates verification success)
@@ -407,7 +408,7 @@ export class VFSLoginFlow {
             await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => { });
 
             // Brief wait for page transition
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
 
             // Analyze result
@@ -600,7 +601,7 @@ export class VFSLoginFlow {
 
         // WAIT: Allow time for slow Turnstile rendering (user request)
         console.log('      ⏳ Waiting 5s for Turnstile to render fully...');
-        await new Promise(r => setTimeout(r, 5000));
+        await delay(2000);
 
         // First, let's see what iframes exist on the page
         const iframeInfo = await this.page.evaluate(() => {
@@ -687,7 +688,7 @@ export class VFSLoginFlow {
                         console.log('      ✅ Clicked center of Turnstile iframe');
 
                         // Wait for verification
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
                         return true;
                     }
                 }
@@ -710,7 +711,7 @@ export class VFSLoginFlow {
                         await this.page.mouse.click(box.x + 25, box.y + box.height / 2);
                         console.log('      ✅ Clicked iframe');
 
-                        await new Promise(r => setTimeout(r, 1500));
+                        await delay(2000);
 
                         // Check if checkbox got checked (Sign In button might become enabled)
                         const signInEnabled = await this.page.evaluate(() => {
@@ -765,7 +766,7 @@ export class VFSLoginFlow {
                 // Click on the left side where checkbox is
                 await this.page.mouse.click(widgetBox.x + 20, widgetBox.y + widgetBox.height / 2);
                 console.log('      ✅ Clicked Turnstile widget');
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
                 return true;
             }
         } catch {
@@ -781,7 +782,7 @@ export class VFSLoginFlow {
      */
     private async analyzeLoginResult(): Promise<LoginResult> {
         // Wait for page to stabilize
-        await new Promise(r => setTimeout(r, 2000));
+        await delay(2000);
 
         const pageUrl = this.page.url();
         const pageTitle = await this.page.title();

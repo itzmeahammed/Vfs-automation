@@ -24,6 +24,7 @@ import {
     SUB_CATEGORIES,
     type ApplicantDetails,
 } from '../config/applicant-config.js';
+import { getTiming, wait, waitWithVariance, delay } from '../config/timing-config.js';
 
 export interface BookingConfig {
     /** Sub-category to select: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family' */
@@ -155,7 +156,7 @@ export class VFSBookingFlow {
 
             // Wait for human verification (5 seconds as requested)
             console.log('   ⏳ Waiting 5 seconds for captcha verification...');
-            await new Promise(r => setTimeout(r, 5000));
+            await delay(2000);
 
             // Look for Submit button - multiple selectors based on DOM
             const submitSelectors = [
@@ -176,14 +177,14 @@ export class VFSBookingFlow {
                     if (await submitBtn.isVisible({ timeout: 2000 })) {
                         console.log(`   🖱️ Found Submit button: ${selector}`);
                         await submitBtn.scrollIntoViewIfNeeded();
-                        await new Promise(r => setTimeout(r, 300));
+                        await delay(2000);
 
                         // Try natural click first
                         await this.behavior.naturalClick(submitBtn);
                         console.log('   ✅ Clicked Submit on captcha dialog');
 
                         // Wait for dialog to close
-                        await new Promise(r => setTimeout(r, 3000));
+                        await delay(2000);
                         await this.takeScreenshot('captcha-submitted');
                         return true;
                     }
@@ -198,7 +199,7 @@ export class VFSBookingFlow {
             if (await anySubmit.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await anySubmit.click({ force: true });
                 console.log('   ✅ Force clicked Submit');
-                await new Promise(r => setTimeout(r, 3000));
+                await delay(2000);
                 return true;
             }
 
@@ -260,11 +261,11 @@ export class VFSBookingFlow {
 
             // Step 5: Wait for Angular to auto-populate "Short Stay" category
             console.log('📂 Waiting for "Short Stay" to auto-select...');
-            await new Promise(r => setTimeout(r, 3000)); // Angular reactivity delay
+            await wait('angularRender');
             console.log('   ✅ Category auto-selected');
 
             // Step 6: Wait for Sub-category dropdown & select
-            await new Promise(r => setTimeout(r, 2000)); // Angular reactivity
+            await wait('angularRender');
             const subCategorySelected = await this.selectSubCategory();
             if (!subCategorySelected) {
                 await this.takeScreenshot('subcategory-selection-failed');
@@ -411,7 +412,7 @@ export class VFSBookingFlow {
             console.log('   📍 URL confirmed: dashboard page');
 
             // Wait a bit for Angular to render
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             // Try multiple approaches to find the button
             const buttonSelectors = [
@@ -519,7 +520,7 @@ export class VFSBookingFlow {
             console.log('   ✅ Clicked Start New Booking');
 
             // Wait for navigation
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             return true;
         } catch (error) {
@@ -586,7 +587,7 @@ export class VFSBookingFlow {
 
                     // Try clicking again
                     await this.behavior.naturalClick(dropdown);
-                    await new Promise(r => setTimeout(r, 2000));
+                    await delay(2000);
 
                     // Check again
                     const optionsVisible = await this.page.locator('.cdk-overlay-container mat-option').first().isVisible({ timeout: 2000 }).catch(() => false);
@@ -594,7 +595,7 @@ export class VFSBookingFlow {
                         console.log('   ⚠️ Still no options, retrying from start...');
                         // Press Escape to close any partial overlay
                         await this.page.keyboard.press('Escape');
-                        await new Promise(r => setTimeout(r, 500));
+                        await delay(2000);
                         continue;
                     }
                 }
@@ -622,7 +623,7 @@ export class VFSBookingFlow {
                         console.log(`   ✅ Selected: ${text?.trim()}`);
 
                         // Wait for selection to register
-                        await new Promise(r => setTimeout(r, 1000));
+                        await delay(2000);
                         return true;
                     }
                 }
@@ -638,7 +639,7 @@ export class VFSBookingFlow {
             // Wait before retry
             if (attempt < maxRetries) {
                 console.log(`   🔄 Retrying in 2 seconds...`);
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
             }
         }
 
@@ -670,7 +671,7 @@ export class VFSBookingFlow {
 
             // Wait longer for the dropdown panel to render (Angular can be slow)
             console.log('   ⏳ Waiting for dropdown panel...');
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
             // Wait for the overlay container with options to appear
             try {
@@ -682,7 +683,7 @@ export class VFSBookingFlow {
             } catch {
                 console.log('   ⚠️ Dropdown panel slow to open, retrying click...');
                 await this.behavior.naturalClick(dropdown);
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
             }
 
             // Get the display text for the sub-category
@@ -759,7 +760,7 @@ export class VFSBookingFlow {
 
         try {
             // Wait for the slot info to render (Angular may take time)
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             // Look for the slot text
             const slotSelectors = [
@@ -817,7 +818,7 @@ export class VFSBookingFlow {
     private async clickContinueButton(): Promise<boolean> {
         try {
             // Wait a bit for the button to be ready
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
             const buttonSelectors = [
                 // From user's DOM inspection
@@ -857,7 +858,7 @@ export class VFSBookingFlow {
             console.log('   ✅ Clicked Continue');
 
             // Wait for navigation
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             return true;
         } catch (error) {
@@ -879,7 +880,7 @@ export class VFSBookingFlow {
             console.log('   📍 URL confirmed: your-details page');
 
             // Wait for page content to load
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             // Check for "Your Details" heading or form elements
             const pageContent = await this.page.textContent('body').catch(() => '');
@@ -890,7 +891,7 @@ export class VFSBookingFlow {
                 // Check for the 13-second warning
                 if (pageContent?.includes('Please wait 13 seconds')) {
                     console.log('   ⏳ Waiting 15 seconds as requested by page...');
-                    await new Promise(r => setTimeout(r, 15000));
+                    await delay(2000);
                 }
 
                 return true;
@@ -938,7 +939,7 @@ export class VFSBookingFlow {
 
         try {
             // Wait for form to be ready
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
             // ═══════════════════════════════════════════════════════════
             // FIRST NAME
@@ -1150,7 +1151,7 @@ export class VFSBookingFlow {
                             dropdown = d;
                             // Click multiple times to ensure it opens
                             await this.behavior.naturalClick(d);
-                            await new Promise(r => setTimeout(r, 800));
+                            await delay(2000);
                             await d.click(); // Direct click as backup
                             dropdownClicked = true;
                             console.log(`   ✅ Clicked dropdown: ${selector}`);
@@ -1163,12 +1164,12 @@ export class VFSBookingFlow {
 
                 if (!dropdownClicked) {
                     console.log('   ⚠️ Could not find nationality dropdown');
-                    await new Promise(r => setTimeout(r, 1000));
+                    await delay(2000);
                     continue;
                 }
 
                 // Wait for panel to open
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
 
                 // Check if panel is visible
                 const panelVisible = await this.page.locator('#mat-select-3-panel mat-option, .cdk-overlay-container mat-option').first().isVisible({ timeout: 3000 }).catch(() => false);
@@ -1177,7 +1178,7 @@ export class VFSBookingFlow {
                     console.log('   ⚠️ Panel not visible, clicking dropdown again...');
                     if (dropdown) {
                         await dropdown.click({ force: true });
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
                     }
                 }
 
@@ -1189,7 +1190,7 @@ export class VFSBookingFlow {
                 if (await exactOption.isVisible({ timeout: 1500 }).catch(() => false)) {
                     await exactOption.click();
                     console.log(`   ✅ Clicked exact match option`);
-                    await new Promise(r => setTimeout(r, 1000));
+                    await delay(2000);
 
                     // Verify selection
                     if (await this.verifyNationalitySelected(nationalityUpper)) {
@@ -1202,7 +1203,7 @@ export class VFSBookingFlow {
                 if (await containsOption.isVisible({ timeout: 1500 }).catch(() => false)) {
                     await containsOption.click();
                     console.log(`   ✅ Clicked contains match option`);
-                    await new Promise(r => setTimeout(r, 1000));
+                    await delay(2000);
 
                     if (await this.verifyNationalitySelected(nationalityUpper)) {
                         return true;
@@ -1223,12 +1224,12 @@ export class VFSBookingFlow {
 
                             // Scroll into view first
                             await opt.scrollIntoViewIfNeeded();
-                            await new Promise(r => setTimeout(r, 200));
+                            await delay(2000);
 
                             // Click it
                             await opt.click();
                             console.log(`   ✅ Clicked option`);
-                            await new Promise(r => setTimeout(r, 1000));
+                            await delay(2000);
 
                             if (await this.verifyNationalitySelected(nationalityUpper)) {
                                 return true;
@@ -1241,7 +1242,7 @@ export class VFSBookingFlow {
 
                 // Close dropdown before retry
                 await this.page.keyboard.press('Escape');
-                await new Promise(r => setTimeout(r, 500));
+                await delay(2000);
 
             } catch (error) {
                 console.log(`   ⚠️ Attempt ${attempt} failed:`, error);
@@ -1250,7 +1251,7 @@ export class VFSBookingFlow {
 
             if (attempt < maxRetries) {
                 console.log('   🔄 Retrying nationality selection...');
-                await new Promise(r => setTimeout(r, 1500));
+                await delay(2000);
             }
         }
 
@@ -1263,7 +1264,7 @@ export class VFSBookingFlow {
      */
     private async verifyNationalitySelected(expectedNationality: string): Promise<boolean> {
         try {
-            await new Promise(r => setTimeout(r, 500));
+            await delay(2000);
 
             // Check the displayed value in the mat-select
             const valueSelectors = [
@@ -1321,7 +1322,7 @@ export class VFSBookingFlow {
                     if (await button.isVisible({ timeout: 3000 })) {
                         // Scroll into view first
                         await button.scrollIntoViewIfNeeded();
-                        await new Promise(r => setTimeout(r, 500));
+                        await delay(2000);
 
                         // Check if button is enabled
                         const isDisabled = await button.isDisabled();
@@ -1335,7 +1336,7 @@ export class VFSBookingFlow {
 
                         // Method 1: Natural click
                         await this.behavior.naturalClick(button);
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
 
                         // Check for captcha popup
                         await this.checkAndHandleCaptcha();
@@ -1345,14 +1346,14 @@ export class VFSBookingFlow {
                         if (pageContent?.includes('Your Details Summary') ||
                             (pageContent?.includes('Applicant 1') && pageContent?.includes('Add another'))) {
                             console.log('   ✅ Save successful - Summary page detected');
-                            await new Promise(r => setTimeout(r, 2000));
+                            await delay(2000);
                             return true;
                         }
 
                         // If still on same page, try force click
                         console.log('   🔄 Retrying with force click...');
                         await button.click({ force: true });
-                        await new Promise(r => setTimeout(r, 3000));
+                        await delay(2000);
 
                         // Check for captcha again
                         await this.checkAndHandleCaptcha();
@@ -1433,7 +1434,7 @@ export class VFSBookingFlow {
                 const captchaHandled = await this.checkAndHandleCaptcha();
                 if (captchaHandled) {
                     console.log('   🔄 Captcha handled, rechecking page...');
-                    await new Promise(r => setTimeout(r, 2000));
+                    await delay(2000);
                 }
 
                 // Maybe we're still on the form page - check for Save button
@@ -1445,7 +1446,7 @@ export class VFSBookingFlow {
             }
 
             // Wait a bit for animations
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
             // Check for captcha before clicking Continue
             await this.checkAndHandleCaptcha();
@@ -1471,18 +1472,18 @@ export class VFSBookingFlow {
                     if (await button.isVisible({ timeout: 3000 })) {
                         console.log(`   🖱️ Found Continue with: ${selector}`);
                         await button.scrollIntoViewIfNeeded();
-                        await new Promise(r => setTimeout(r, 500));
+                        await delay(2000);
 
                         // Try natural click first
                         await this.behavior.naturalClick(button);
                         console.log('   ✅ Clicked Continue');
 
                         // Wait and check for captcha
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
                         await this.checkAndHandleCaptcha();
 
                         // Wait for navigation to Book Appointment page
-                        await new Promise(r => setTimeout(r, 3000));
+                        await delay(2000);
                         return true;
                     }
                 } catch {
@@ -1496,7 +1497,7 @@ export class VFSBookingFlow {
             if (await anyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await anyButton.click({ force: true });
                 console.log('   ✅ Force clicked Continue');
-                await new Promise(r => setTimeout(r, 3000));
+                await delay(2000);
                 return true;
             }
 
@@ -1520,7 +1521,7 @@ export class VFSBookingFlow {
             console.log('   ✅ Book Appointment page loaded');
 
             // Wait for content
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             return true;
         } catch (error) {

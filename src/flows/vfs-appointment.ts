@@ -16,6 +16,7 @@ import {
     HumanTimingEngine,
     BehaviorSimulator,
 } from '../core/index.js';
+import { getTiming, wait, waitWithVariance, delay } from '../config/timing-config.js';
 
 export interface AppointmentResult {
     success: boolean;
@@ -96,13 +97,13 @@ export class VFSAppointmentFlow {
                     await this.takeScreenshot('captcha-detected');
 
                     console.log('   ⏳ Waiting 5 seconds for captcha...');
-                    await new Promise(r => setTimeout(r, 5000));
+                    await delay(2000);
 
                     const submitBtn = this.page.locator('button:has-text("Submit")').first();
                     if (await submitBtn.isVisible({ timeout: 2000 })) {
                         await submitBtn.click({ force: true });
                         console.log('   ✅ Clicked Submit on captcha');
-                        await new Promise(r => setTimeout(r, 3000));
+                        await delay(2000);
                         return true;
                     }
                 }
@@ -136,7 +137,7 @@ export class VFSAppointmentFlow {
                 return { success: false, state: 'waiting', message: 'No available dates found' };
             }
 
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
 
             // Step 3: Select time slot
             console.log('\n⏰ Looking for available time slots...');
@@ -171,7 +172,7 @@ export class VFSAppointmentFlow {
 
             // Step 5: Handle Services page (just click Continue)
             console.log('\n🛒 Handling Services page...');
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
             const servicesHandled = await this.handleServicesPage();
             await this.takeScreenshot('services-page');
 
@@ -187,7 +188,7 @@ export class VFSAppointmentFlow {
 
             // Step 6: Handle Review page (log all details)
             console.log('\n📋 Handling Review page...');
-            await new Promise(r => setTimeout(r, 3000));
+            await delay(2000);
             const reviewDetails = await this.handleReviewPage();
             await this.takeScreenshot('review-page');
 
@@ -229,7 +230,7 @@ export class VFSAppointmentFlow {
                 try {
                     await this.page.waitForSelector(selector, { timeout: 10000 });
                     console.log(`   ✅ Found calendar element: ${selector}`);
-                    await new Promise(r => setTimeout(r, 2000));
+                    await delay(2000);
                     return true;
                 } catch {
                     continue;
@@ -239,7 +240,7 @@ export class VFSAppointmentFlow {
             const pageText = await this.page.textContent('body').catch(() => '');
             if (pageText?.includes('Book an Appointment')) {
                 console.log('   ✅ Book Appointment page detected by content');
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
                 return true;
             }
 
@@ -256,7 +257,7 @@ export class VFSAppointmentFlow {
 
         for (let monthAttempt = 0; monthAttempt < maxMonthAttempts; monthAttempt++) {
             try {
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
 
                 const monthHeader = await this.page.locator('.fc-toolbar-title, h2').first().textContent().catch(() => 'Unknown');
                 console.log(`\n   📅 Checking month: ${monthHeader?.trim()}`);
@@ -274,11 +275,11 @@ export class VFSAppointmentFlow {
                     console.log(`   🎯 First available date: ${dateNumber?.trim()} (${dataDate})`);
 
                     await firstAvailable.scrollIntoViewIfNeeded();
-                    await new Promise(r => setTimeout(r, 500));
+                    await delay(2000);
                     await this.behavior.naturalClick(firstAvailable);
                     console.log(`   ✅ Clicked available date: ${dateNumber?.trim()}`);
 
-                    await new Promise(r => setTimeout(r, 2000));
+                    await delay(2000);
 
                     const timeSlotsVisible = await this.page.locator('div.ba-slot-box, table.ba-slot-table, h2:has-text("Choose an appointment time")').isVisible({ timeout: 5000 }).catch(() => false);
 
@@ -293,7 +294,7 @@ export class VFSAppointmentFlow {
                             await secondAvailable.scrollIntoViewIfNeeded();
                             await this.behavior.naturalClick(secondAvailable);
                             console.log(`   ✅ Clicked second available date: ${date2}`);
-                            await new Promise(r => setTimeout(r, 2000));
+                            await delay(2000);
                             return date2 || 'Available date';
                         }
                     }
@@ -334,7 +335,7 @@ export class VFSAppointmentFlow {
 
                         await this.behavior.naturalClick(nextBtn);
                         console.log('   ➡️ Clicked next month button');
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
                         return true;
                     }
                 } catch {
@@ -346,7 +347,7 @@ export class VFSAppointmentFlow {
             if (await anyNextBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await anyNextBtn.click({ force: true });
                 console.log('   ➡️ Force clicked next month');
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
                 return true;
             }
 
@@ -368,13 +369,13 @@ export class VFSAppointmentFlow {
      */
     private async selectEarliestTimeSlot(): Promise<string | null> {
         try {
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(2000);
 
             console.log('   🔍 Looking for time slot...');
 
             // Scroll to make time slots visible
             await this.page.evaluate(() => window.scrollBy(0, 500));
-            await new Promise(r => setTimeout(r, 1000));
+            await delay(2000);
 
             // From user's DOM: div.ba-slot-box is the clickable container
             const slotSelectors = [
@@ -398,12 +399,12 @@ export class VFSAppointmentFlow {
                             console.log(`   🕐 Time found: ${timeCell?.trim()}`);
 
                             await firstSlot.scrollIntoViewIfNeeded();
-                            await new Promise(r => setTimeout(r, 300));
+                            await delay(2000);
 
                             await this.behavior.naturalClick(firstSlot);
                             console.log(`   ✅ Clicked time slot: ${timeCell?.trim() || selector}`);
 
-                            await new Promise(r => setTimeout(r, 2000));
+                            await delay(2000);
 
                             // Verify selection
                             const selected = await this.page.locator('div.ba-slot-radio-label-text2:has-text("Selected"), input.ba-slot-radio:checked').isVisible({ timeout: 2000 }).catch(() => false);
@@ -428,7 +429,7 @@ export class VFSAppointmentFlow {
                 const timeCell = await this.page.locator('td.align-middle').first().textContent().catch(() => '');
                 await anySlot.click({ force: true });
                 console.log(`   ✅ Force clicked: ${timeCell?.trim()}`);
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
                 return timeCell?.trim() || 'Selected';
             }
 
@@ -462,14 +463,14 @@ export class VFSAppointmentFlow {
                         }
 
                         await button.scrollIntoViewIfNeeded();
-                        await new Promise(r => setTimeout(r, 500));
+                        await delay(2000);
 
                         await this.behavior.naturalClick(button);
                         console.log('   ✅ Clicked Continue');
 
-                        await new Promise(r => setTimeout(r, 2000));
+                        await delay(2000);
                         await this.checkAndHandleCaptcha();
-                        await new Promise(r => setTimeout(r, 3000));
+                        await delay(2000);
                         return true;
                     }
                 } catch {
@@ -483,7 +484,7 @@ export class VFSAppointmentFlow {
                 if (!isDisabled) {
                     await anyButton.click({ force: true });
                     console.log('   ✅ Force clicked Continue');
-                    await new Promise(r => setTimeout(r, 3000));
+                    await delay(2000);
                     return true;
                 }
             }
@@ -530,7 +531,7 @@ export class VFSAppointmentFlow {
 
             if (continueClicked) {
                 console.log('   ✅ Passed Services page');
-                await new Promise(r => setTimeout(r, 2000));
+                await delay(2000);
                 return true;
             }
 
