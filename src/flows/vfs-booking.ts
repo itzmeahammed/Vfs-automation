@@ -259,20 +259,55 @@ export class VFSBookingFlow {
             }
             await this.takeScreenshot('centre-selected');
 
-            // Step 5: Select Category dropdown (Japan doesn't auto-select like Malta)
-            console.log('📂 Selecting Category...');
-            await delay(1000);
-            const categorySelected = await this.selectCategory();
-            if (!categorySelected) {
-                console.log('   ⚠️ Category selection failed, continuing anyway...');
-            }
-            console.log('   ✅ Category selected');
+            // Wait for loader after Application Centre selection
+            await this.waitForLoader();
 
-            // Step 6: Wait for Sub-category dropdown & select
-            await delay(1000);
-            const subCategorySelected = await this.selectSubCategory();
+            // Step 5: Select Category dropdown with retry (Japan doesn't auto-select)
+            console.log('📂 Selecting Category...');
+            let categorySelected = false;
+            for (let retry = 1; retry <= 3; retry++) {
+                console.log(`   📍 Category attempt ${retry}/3...`);
+                categorySelected = await this.selectCategory();
+                if (categorySelected) {
+                    await this.waitForLoader();
+                    // Verify selection
+                    const verified = await this.verifyDropdownSelected(1);
+                    if (verified) {
+                        console.log('   ✅ Category selected and verified');
+                        break;
+                    }
+                }
+                await delay(500);
+            }
+            if (!categorySelected) {
+                console.log('   ❌ Category selection failed after 3 attempts');
+                return {
+                    success: false,
+                    state: 'failed',
+                    message: 'Could not select Category',
+                };
+            }
+
+            // Step 6: Select Sub-category dropdown with retry
+            console.log('📁 Selecting Sub-category...');
+            let subCategorySelected = false;
+            for (let retry = 1; retry <= 3; retry++) {
+                console.log(`   📍 Sub-category attempt ${retry}/3...`);
+                subCategorySelected = await this.selectSubCategory();
+                if (subCategorySelected) {
+                    await this.waitForLoader();
+                    // Verify selection
+                    const verified = await this.verifyDropdownSelected(2);
+                    if (verified) {
+                        console.log('   ✅ Sub-category selected and verified');
+                        break;
+                    }
+                }
+                await delay(500);
+            }
             if (!subCategorySelected) {
                 await this.takeScreenshot('subcategory-selection-failed');
+                console.log('   ❌ Sub-category selection failed after 3 attempts');
                 return {
                     success: false,
                     state: 'failed',
@@ -281,11 +316,11 @@ export class VFSBookingFlow {
             }
             await this.takeScreenshot('subcategory-selected');
 
-            // Step 7: Detect earliest available slot
-            console.log('\n   ✅ All dropdowns filled successfully!');
+            // Step 7: ALL 3 DROPDOWNS SELECTED - Now detect earliest available slot
+            console.log('\n   ✅ All 3 dropdowns filled successfully!');
             console.log('   📋 Form Summary:');
             console.log(`      - Centre: ${this.config.applicationCentre}`);
-            console.log(`      - Category: Short Stay (auto)`);
+            console.log(`      - Category: E-Visa Tourist Single Entry`);
             console.log(`      - Sub-category: ${SUB_CATEGORY_MAP[this.config.subCategory] || this.config.subCategory}`);
 
             // Wait for slot info to appear
@@ -548,6 +583,61 @@ export class VFSBookingFlow {
             await new Promise(r => setTimeout(r, this.timing.getThinkingPause('moderate')));
         } catch {
             console.log('   ⚠️ Page load wait timed out, continuing anyway...');
+        }
+    }
+
+    /**
+     * Wait for Angular loader/spinner to disappear
+     */
+    private async waitForLoader(): Promise<void> {
+        try {
+            // Common Angular loader/spinner selectors
+            const loaderSelectors = [
+                '.loader',
+                '.spinner',
+                '.loading',
+                'mat-spinner',
+                '.mat-progress-spinner',
+                '.cdk-overlay-backdrop',
+            ];
+
+            for (const selector of loaderSelectors) {
+                const loader = this.page.locator(selector);
+                if (await loader.isVisible({ timeout: 500 }).catch(() => false)) {
+                    console.log(`   ⏳ Waiting for loader to disappear...`);
+                    await loader.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => { });
+                    await delay(300);
+                    break;
+                }
+            }
+
+            // Small delay to let Angular update DOM
+            await delay(300);
+        } catch {
+            // Loader already gone or not present
+        }
+    }
+
+    /**
+     * Verify a dropdown has a selected value (not placeholder)
+     * @param dropdownIndex 0=Centre, 1=Category, 2=Sub-category
+     */
+    private async verifyDropdownSelected(dropdownIndex: number): Promise<boolean> {
+        try {
+            const dropdown = this.page.locator('mat-select').nth(dropdownIndex);
+
+            // Check if dropdown has a selected value (not placeholder text)
+            const value = await dropdown.locator('.mat-mdc-select-value-text, .mat-select-value-text').textContent({ timeout: 2000 });
+
+            if (value && value.trim() && !value.includes('Select') && !value.includes('Choose')) {
+                console.log(`   ✅ Dropdown ${dropdownIndex} verified: "${value.trim().substring(0, 30)}..."`);
+                return true;
+            }
+
+            console.log(`   ⚠️ Dropdown ${dropdownIndex} not yet selected`);
+            return false;
+        } catch {
+            return false;
         }
     }
 
