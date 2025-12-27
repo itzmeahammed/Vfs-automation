@@ -7,9 +7,10 @@
  * Usage: npm run loop
  */
 
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { Page } from 'playwright';
 import { loopConfig, validateConfig, AccountCredentials } from './config/loop-config.js';
 import { setTimingMode, delay } from './config/timing-config.js';
+import { BrowserIdentityManager } from './core/browser-identity.js';
 import { VFSLoginFlow } from './flows/vfs-login.js';
 import { VFSBookingFlow } from './flows/vfs-booking.js';
 import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegram.js';
@@ -22,8 +23,7 @@ const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/mlt/login';
  * Main Loop Runner Class
  */
 class LoopRunner {
-    private browser: Browser | null = null;
-    private context: BrowserContext | null = null;
+    private identity: BrowserIdentityManager | null = null;
     private page: Page | null = null;
     private cycleCount: number = 0;
 
@@ -93,13 +93,16 @@ class LoopRunner {
      * Process a single account - login, check slots N times, logout
      */
     private async processAccount(account: AccountCredentials, accountIndex: number): Promise<void> {
-        // Launch browser
-        await this.launchBrowser();
+        // Launch browser with stealth
+        await this.launchBrowser(account.email);
         if (!this.page) throw new Error('Page not initialized');
 
         // Login
         console.log('\n🔐 Logging in...');
-        const loginFlow = new VFSLoginFlow(this.page);
+        const loginFlow = new VFSLoginFlow(this.page, {
+            loginUrl: VFS_LOGIN_URL,
+            screenshotOnError: true,
+        });
         const loginResult = await loginFlow.execute({
             email: account.email,
             password: account.password,
@@ -204,40 +207,32 @@ class LoopRunner {
     }
 
     /**
-     * Launch browser
+     * Launch browser using BrowserIdentityManager (same as npm run dev)
      */
-    private async launchBrowser(): Promise<void> {
-        this.browser = await chromium.launch({
+    private async launchBrowser(accountEmail: string): Promise<void> {
+        // Create profile ID from email
+        const profileId = `vfs-loop-${accountEmail.split('@')[0]}`;
+
+        this.identity = new BrowserIdentityManager({
+            profileId: profileId,
             headless: loopConfig.headless,
-            args: [
-                '--disable-blink-features=AutomationControlled',
-                '--no-sandbox',
-            ],
+            persistSession: true,
+            profilesDir: './browser-profiles',
         });
 
-        this.context = await this.browser.newContext({
-            viewport: { width: 1366, height: 768 },
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        });
-
-        // Anti-detection
-        await this.context.addInitScript(() => {
-            Object.defineProperty(navigator, 'webdriver', { get: () => false });
-        });
-
-        this.page = await this.context.newPage();
+        const { page } = await this.identity.launch();
+        this.page = page;
     }
 
     /**
      * Close browser
      */
     private async closeBrowser(): Promise<void> {
-        if (this.page) await this.page.close().catch(() => { });
-        if (this.context) await this.context.close().catch(() => { });
-        if (this.browser) await this.browser.close().catch(() => { });
+        if (this.identity) {
+            await this.identity.close();
+            this.identity = null;
+        }
         this.page = null;
-        this.context = null;
-        this.browser = null;
     }
 
     /**
@@ -251,3 +246,4 @@ class LoopRunner {
 // Main entry point
 const runner = new LoopRunner();
 runner.run().catch(console.error);
+

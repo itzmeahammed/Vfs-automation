@@ -70,9 +70,8 @@ export const loopConfig: LoopConfig = {
 
     // Account credentials - add 2-3 accounts
     accounts: [
-        { email: 'your_email1@gmail.com', password: 'your_password1' },
-        { email: 'your_email2@gmail.com', password: 'your_password2' },
-        // { email: 'your_email3@gmail.com', password: 'your_password3' },
+        { email: 'ahammedx5@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },
     ],
 
     // Check slot this many times per login (default: 5)
@@ -83,9 +82,9 @@ export const loopConfig: LoopConfig = {
 
     // Telegram settings
     telegram: {
-        enabled: false,  // Set to true to enable
-        botToken: 'YOUR_BOT_TOKEN_HERE',  // Get from @BotFather
-        chatId: 'YOUR_CHAT_ID_HERE',       // Your Telegram chat ID
+        enabled: true,  // Set to true to enable
+        botToken: '8380612073:AAEEaPY_XMcJlsck_yzB2a8SN7cheXd10oE',  // Get from @BotFather
+        chatId: '-1003568600391',       // Your Telegram chat ID
     },
 
     // VFS sub-category
