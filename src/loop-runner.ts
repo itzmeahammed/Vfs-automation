@@ -134,12 +134,13 @@ class LoopRunner {
                     }
                 } else {
                     console.log('   ❌ No slot found');
+                    await sendStatusUpdate(`❌ No slot - Check ${slotCheck}/${loopConfig.slotsPerLogin}\n📧 ${account.email}`);
                 }
 
                 // Go back to dashboard for next check (if not last)
                 if (slotCheck < loopConfig.slotsPerLogin) {
                     await this.goBackToDashboard();
-                    await delay(3000);
+                    await delay(500);  // Faster!
                 }
             } catch (error) {
                 console.log(`   ❌ Error checking slot: ${error}`);

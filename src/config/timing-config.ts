@@ -66,21 +66,21 @@ const BALANCED_TIMING: TimingConfig = {
 };
 
 const FAST_TIMING: TimingConfig = {
-    pageLoad: 1500,
-    angularRender: 1000,
-    beforeClick: 200,
-    afterClick: 600,
-    betweenActions: 400,
-    beforeTyping: 100,
-    afterTyping: 200,
-    betweenFields: 300,
-    dropdownOpen: 600,
-    dropdownSelect: 500,
-    captchaWait: 5000,
-    afterCaptcha: 1500,
-    retryDelay: 1000,
-    selectorTimeout: 2000,
-    visibilityTimeout: 1500,
+    pageLoad: 500,
+    angularRender: 300,
+    beforeClick: 50,
+    afterClick: 200,
+    betweenActions: 100,
+    beforeTyping: 30,
+    afterTyping: 50,
+    betweenFields: 100,
+    dropdownOpen: 200,
+    dropdownSelect: 150,
+    captchaWait: 3000,
+    afterCaptcha: 500,
+    retryDelay: 300,
+    selectorTimeout: 1000,
+    visibilityTimeout: 500,
 };
 
 let currentMode: TimingMode = 'balanced';
@@ -128,12 +128,12 @@ export async function waitWithVariance(type: keyof TimingConfig, variancePercent
 export async function delay(ms: number): Promise<void> {
     const multipliers: Record<TimingMode, number> = {
         safe: 1.0,
-        balanced: 0.5,
-        fast: 0.33,
+        balanced: 0.4,
+        fast: 0.15,  // Ultra fast - 15% of original
     };
 
     const multiplier = multipliers[currentMode];
-    const adjustedMs = Math.max(100, Math.floor(ms * multiplier));
+    const adjustedMs = Math.max(50, Math.floor(ms * multiplier));  // Min 50ms
 
     await new Promise(r => setTimeout(r, adjustedMs));
 }
