@@ -652,6 +652,50 @@ export class VFSAppointmentFlow {
             } catch { /* ignore */ }
 
             console.log('   ' + '═'.repeat(50));
+
+            // Click the required checkboxes
+            console.log('\n   ☑️ Clicking required checkboxes...');
+
+            // Checkbox 1: Terms and Conditions (mat-mdc-checkbox-0)
+            try {
+                const termsCheckbox = this.page.locator('#mat-mdc-checkbox-0-input, mat-checkbox#mat-mdc-checkbox-0 input, mat-checkbox:has-text("Terms and Conditions") input').first();
+                if (await termsCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await termsCheckbox.click({ force: true });
+                    console.log('   ✅ Clicked Terms and Conditions checkbox');
+                } else {
+                    // Try clicking the mat-checkbox element directly
+                    const termsBox = this.page.locator('mat-checkbox#mat-mdc-checkbox-0, mat-checkbox:has-text("Terms")').first();
+                    if (await termsBox.isVisible({ timeout: 2000 }).catch(() => false)) {
+                        await termsBox.click({ force: true });
+                        console.log('   ✅ Clicked Terms checkbox (via mat-checkbox)');
+                    }
+                }
+            } catch (e) {
+                console.log('   ⚠️ Could not click Terms checkbox:', e);
+            }
+
+            await delay(500);
+
+            // Checkbox 2: Marketing communication (mat-mdc-checkbox-1)
+            try {
+                const marketingCheckbox = this.page.locator('#mat-mdc-checkbox-1-input, mat-checkbox#mat-mdc-checkbox-1 input, mat-checkbox:has-text("receive future communication") input').first();
+                if (await marketingCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+                    await marketingCheckbox.click({ force: true });
+                    console.log('   ✅ Clicked Marketing communication checkbox');
+                } else {
+                    // Try clicking the mat-checkbox element directly
+                    const marketingBox = this.page.locator('mat-checkbox#mat-mdc-checkbox-1, mat-checkbox:has-text("communication")').first();
+                    if (await marketingBox.isVisible({ timeout: 2000 }).catch(() => false)) {
+                        await marketingBox.click({ force: true });
+                        console.log('   ✅ Clicked Marketing checkbox (via mat-checkbox)');
+                    }
+                }
+            } catch (e) {
+                console.log('   ⚠️ Could not click Marketing checkbox:', e);
+            }
+
+            await delay(1000);
+
             console.log('\n   🎉 BOOKING READY FOR FINAL CONFIRMATION!');
             console.log('   ⚠️ Manual payment required to complete booking.\n');
 
