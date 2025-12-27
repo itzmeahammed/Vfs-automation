@@ -316,6 +316,11 @@ export class VFSBookingFlow {
             }
             await this.takeScreenshot('subcategory-selected');
 
+            // Wait for loader to disappear after sub-category selection
+            console.log('\n   ⏳ Waiting for slot information to load...');
+            await this.waitForLoader();
+            await delay(3000);  // Extra wait for Angular to render slots
+
             // Step 7: ALL 3 DROPDOWNS SELECTED - Now detect earliest available slot
             console.log('\n   ✅ All 3 dropdowns filled successfully!');
             console.log('   📋 Form Summary:');
@@ -323,8 +328,8 @@ export class VFSBookingFlow {
             console.log(`      - Category: E-Visa Tourist Single Entry`);
             console.log(`      - Sub-category: ${SUB_CATEGORY_MAP[this.config.subCategory] || this.config.subCategory}`);
 
-            // Wait for slot info to appear
-            console.log('\n🔍 Looking for earliest available slot...');
+            // Detect slot info
+            console.log('\n🔍 Looking for earliest available slots...');
             const slotInfo = await this.detectEarliestSlot();
             await this.takeScreenshot('slot-detection');
 

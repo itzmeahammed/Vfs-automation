@@ -1,6 +1,7 @@
 node_modules/
 dist/
 browser-profiles/
+screenshots/
 *.log
 .env
 .env.local
