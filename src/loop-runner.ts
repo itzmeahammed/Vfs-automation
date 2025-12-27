@@ -227,14 +227,22 @@ class LoopRunner {
     }
 
     /**
-     * Close browser
+     * Close browser completely and wait for cleanup
      */
     private async closeBrowser(): Promise<void> {
-        if (this.identity) {
-            await this.identity.close();
-            this.identity = null;
+        try {
+            if (this.identity) {
+                console.log('   🔄 Closing browser...');
+                await this.identity.close();
+                this.identity = null;
+                console.log('   ✅ Browser closed');
+            }
+        } catch (error) {
+            console.log('   ⚠️ Browser close error:', error);
         }
         this.page = null;
+        // Wait for browser process to fully terminate
+        await this.sleep(2000);
     }
 
     /**
