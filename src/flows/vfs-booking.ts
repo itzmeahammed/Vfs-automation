@@ -604,19 +604,19 @@ export class VFSBookingFlow {
                     }
                 }
 
-                // Find and click the option
-                const optionText = this.config.applicationCentre || 'Malta Visa application center- Dubai';
+                // Find and click the option - Japan Visa Application Centre, Dubai (id=DXB)
+                const optionText = this.config.applicationCentre || 'Japan Visa Application Centre, Dubai';
 
                 // Try multiple strategies to find the option
                 const selectionStrategies = [
-                    // Strategy 1: Exact match
-                    () => this.page.locator('mat-option').filter({ hasText: optionText }).first(),
-                    // Strategy 2: Contains Dubai
+                    // Strategy 1: Exact Japan Dubai match (id=DXB)
+                    () => this.page.locator('mat-option#DXB').first(),
+                    // Strategy 2: Contains Japan and Dubai
+                    () => this.page.locator('mat-option:has-text("Japan Visa Application Centre, Dubai")').first(),
+                    // Strategy 3: Contains Japan and Dubai partial
+                    () => this.page.locator('mat-option:has-text("Japan")').filter({ hasText: 'Dubai' }).first(),
+                    // Strategy 4: Just Dubai
                     () => this.page.locator('mat-option:has-text("Dubai")').first(),
-                    // Strategy 3: Contains Abu Dhabi
-                    () => this.page.locator('mat-option:has-text("Abu Dhabi")').first(),
-                    // Strategy 4: Any Malta option
-                    () => this.page.locator('mat-option:has-text("Malta")').first(),
                 ];
 
                 for (const getOption of selectionStrategies) {
@@ -653,17 +653,17 @@ export class VFSBookingFlow {
 
     /**
      * Select Category dropdown (for Japan - doesn't auto-select)
-     * Looks for category dropdown and selects first available option
+     * Select "E-Visa - *Tourist Single Entry" (id=JUV4) from mat-select-2
      */
     private async selectCategory(): Promise<boolean> {
-        console.log('   🔍 Looking for Category dropdown...');
+        console.log('   🔍 Looking for Category dropdown (mat-select-2)...');
 
         try {
-            // Find the second mat-select (first is Application Centre, second is Category)
+            // mat-select-2 is the category dropdown for Japan
             const categorySelectors = [
-                'mat-select:nth-of-type(2)',
+                'mat-select#mat-select-2',
+                'mat-select[formcontrolname="selectedSubvisaCategory"]',
                 'mat-form-field:has-text("Category") mat-select',
-                'mat-select#mat-select-1',
             ];
 
             for (const selector of categorySelectors) {
@@ -672,16 +672,24 @@ export class VFSBookingFlow {
                     if (await dropdown.isVisible({ timeout: 2000 })) {
                         await dropdown.click({ force: true });
                         console.log(`   ✅ Clicked category dropdown: ${selector}`);
-                        await delay(500);
+                        await delay(300);
 
-                        // Wait for options and click first one
-                        const option = this.page.locator('mat-option').first();
-                        if (await option.isVisible({ timeout: 2000 })) {
-                            const text = await option.textContent();
-                            await option.click({ force: true });
-                            console.log(`   ✅ Selected category: ${text?.trim()}`);
-                            await delay(500);
-                            return true;
+                        // Look for E-Visa Tourist Single Entry (id=JUV4)
+                        const optionStrategies = [
+                            () => this.page.locator('mat-option#JUV4').first(),
+                            () => this.page.locator('mat-option:has-text("E-Visa")').filter({ hasText: 'Tourist Single Entry' }).first(),
+                            () => this.page.locator('mat-option:has-text("Tourist Single Entry")').first(),
+                        ];
+
+                        for (const getOption of optionStrategies) {
+                            const option = getOption();
+                            if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
+                                const text = await option.textContent();
+                                await option.click({ force: true });
+                                console.log(`   ✅ Selected category: ${text?.trim()}`);
+                                await delay(300);
+                                return true;
+                            }
                         }
                     }
                 } catch {
@@ -745,9 +753,10 @@ export class VFSBookingFlow {
             // Try multiple selection strategies based on DOM structure
             // From DOM: mat-option has id like "Tou" for Tourism, text in span.mdc-list-item__primary-text
 
-            // Strategy 1: By ID (Tourism = "Tou", Business = "BUS", etc.)
+            // Strategy 1: By ID - Japan uses JUSV7 for Single Entry Tourism General
             const idMap: Record<string, string> = {
-                'tourism': 'Tou',
+                'tourism': 'JUSV7',           // Japan: Single Entry Tourism General
+                'single_entry_tourism': 'JUSV7',
                 'business': 'BUS',
                 'sports_cultural': 'Sports',
                 'visiting_family': 'Visit',
@@ -757,8 +766,25 @@ export class VFSBookingFlow {
             if (optionId) {
                 const optionById = this.page.locator(`mat-option#${optionId}`);
                 if (await optionById.isVisible({ timeout: 2000 })) {
-                    await this.behavior.naturalClick(optionById);
+                    await optionById.click({ force: true });
                     console.log(`   ✅ Selected by ID: ${optionId}`);
+                    return true;
+                }
+            }
+
+            // Strategy 2: Look for Single Entry Tourism General text
+            const japanOptions = [
+                () => this.page.locator('mat-option#JUSV7').first(),
+                () => this.page.locator('mat-option:has-text("Single Entry Tourism General")').first(),
+                () => this.page.locator('mat-option:has-text("Tourism General")').first(),
+            ];
+
+            for (const getOption of japanOptions) {
+                const option = getOption();
+                if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    const text = await option.textContent();
+                    await option.click({ force: true });
+                    console.log(`   ✅ Selected Japan sub-category: ${text?.trim()}`);
                     return true;
                 }
             }
