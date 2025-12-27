@@ -317,9 +317,9 @@ export class VFSBookingFlow {
             await this.takeScreenshot('subcategory-selected');
 
             // Wait for loader to disappear after sub-category selection
-            console.log('\n   ⏳ Waiting for slot information to load...');
+            console.log('\n   ⏳ Waiting 10 seconds for slot info to load...');
             await this.waitForLoader();
-            await delay(3000);  // Extra wait for Angular to render slots
+            await delay(10000);  // 10 seconds wait for Angular to render slots
 
             // Step 7: ALL 3 DROPDOWNS SELECTED - Now detect earliest available slot
             console.log('\n   ✅ All 3 dropdowns filled successfully!');
