@@ -659,9 +659,9 @@ export class VFSBookingFlow {
         console.log('   🔍 Looking for Category dropdown (mat-select-2)...');
 
         try {
-            // mat-select-2 is the category dropdown for Japan
+            // mat-select-1 is the category dropdown for Japan
             const categorySelectors = [
-                'mat-select#mat-select-2',
+                'mat-select#mat-select-1',
                 'mat-select[formcontrolname="selectedSubvisaCategory"]',
                 'mat-form-field:has-text("Category") mat-select',
             ];
@@ -724,12 +724,12 @@ export class VFSBookingFlow {
                 return false;
             }
 
-            // Click to open dropdown
-            await this.behavior.naturalClick(dropdown);
+            // Click to open dropdown - fast direct click
+            await dropdown.click({ force: true });
 
-            // Wait longer for the dropdown panel to render (Angular can be slow)
+            // Wait for the dropdown panel to render
             console.log('   ⏳ Waiting for dropdown panel...');
-            await new Promise(r => setTimeout(r, 2000));
+            await delay(500);
 
             // Wait for the overlay container with options to appear
             try {
