@@ -927,61 +927,47 @@ export class VFSBookingFlow {
     }
 
     /**
-     * Detect the "Earliest available slot" text and extract the date
-     * Example: "Earliest available slot for 1 Applicants is : 13-01-2026"
+     * Detect ALL "Earliest available slot" texts (1, 2, 3-4 applicants)
+     * Returns formatted list of all slots found
      */
     private async detectEarliestSlot(): Promise<string | null> {
-        console.log('   ⏳ Waiting for slot information to appear...');
+        console.log('   ⏳ Looking for slot information...');
 
         try {
-            // Wait for the slot info to render (Angular may take time)
-            await new Promise(r => setTimeout(r, 3000));
+            // Wait for slot info to render (reduced from 3s to 1s)
+            await delay(1000);
 
-            // Look for the slot text
-            const slotSelectors = [
-                'text=/Earliest available slot/i',
-                '*:has-text("Earliest available slot")',
-                '.slot-info',
-                '[class*="earliest"]',
-            ];
-
-            for (const selector of slotSelectors) {
-                try {
-                    const element = this.page.locator(selector).first();
-                    if (await element.isVisible({ timeout: 2000 })) {
-                        const text = await element.textContent();
-                        if (text && text.includes('Earliest available slot')) {
-                            // Extract the date using regex
-                            const dateMatch = text.match(/(\d{2}-\d{2}-\d{4})/);
-                            if (dateMatch) {
-                                const date = dateMatch[1];
-                                console.log(`   🎯 Found slot date: ${date}`);
-                                return date;
-                            }
-                            // Return full text if date pattern not found
-                            console.log(`   📝 Found slot text: ${text.trim()}`);
-                            return text.trim();
-                        }
-                    }
-                } catch {
-                    continue;
-                }
-            }
-
-            // Fallback: search entire page content for the pattern
+            // Get all slot texts from page
             const pageContent = await this.page.textContent('body');
-            if (pageContent) {
-                const slotMatch = pageContent.match(/Earliest available slot.*?:\s*(\d{2}-\d{2}-\d{4})/i);
-                if (slotMatch) {
-                    console.log(`   🎯 Found slot date (from page): ${slotMatch[1]}`);
-                    return slotMatch[1];
+            if (!pageContent) {
+                console.log('   ⚠️ No page content');
+                return null;
+            }
+
+            // Match all "Earliest available slot for X Applicants is : DD-MM-YYYY" patterns
+            const allSlots: string[] = [];
+            const slotPattern = /Earliest available slot for ([^:]+): (\d{2}-\d{2}-\d{4})/gi;
+            let match;
+            while ((match = slotPattern.exec(pageContent)) !== null) {
+                const applicants = match[1].trim();
+                const date = match[2];
+                const slotText = `${applicants}: ${date}`;
+                if (!allSlots.includes(slotText)) {
+                    allSlots.push(slotText);
+                    console.log(`   🎯 ${slotText}`);
                 }
             }
 
-            console.log('   ⚠️ No slot information found yet');
+            if (allSlots.length > 0) {
+                const slotsFormatted = allSlots.map((s, i) => `${i + 1}. ${s}`).join('\n');
+                console.log(`\n📋 ALL SLOTS:\n${slotsFormatted}`);
+                return slotsFormatted;
+            }
+
+            console.log('   ⚠️ No slot information found');
             return null;
         } catch (error) {
-            console.log('   ❌ Error detecting slot:', error);
+            console.log('   ❌ Error detecting slots:', error);
             return null;
         }
     }
