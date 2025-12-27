@@ -746,92 +746,101 @@ export class VFSBookingFlow {
      * Select "E-Visa - *Tourist Single Entry" (id=JUV4) from mat-select-2
      */
     private async selectCategory(): Promise<boolean> {
-        console.log('   🔍 Looking for Category dropdown (mat-select-2)...');
+        console.log('   🔍 Looking for Category dropdown...');
 
         try {
-            // mat-select-1 is the category dropdown for Japan
-            const categorySelectors = [
-                'mat-select#mat-select-1',
-                'mat-select[formcontrolname="selectedSubvisaCategory"]',
-                'mat-form-field:has-text("Category") mat-select',
+            // Wait for page to be stable
+            await delay(1000);
+
+            // Category is mat-select-2 (from user's image)
+            const dropdown = this.page.locator('mat-select#mat-select-2');
+
+            if (!await dropdown.isVisible({ timeout: 3000 })) {
+                console.log('   ❌ Category dropdown mat-select-2 not visible');
+                return false;
+            }
+
+            // Click to open dropdown
+            await dropdown.click({ force: true });
+            console.log('   ✅ Clicked category dropdown');
+
+            // Wait for options panel to appear
+            await delay(2000);
+
+            // Wait for mat-option to be visible
+            try {
+                await this.page.waitForSelector('mat-option', { state: 'visible', timeout: 5000 });
+                console.log('   ✅ Options panel opened');
+            } catch {
+                console.log('   ⚠️ Options panel not visible');
+                return false;
+            }
+
+            // Click E-Visa Tourist Single Entry (id=JUV4)
+            const optionSelectors = [
+                'mat-option#JUV4',
+                'mat-option:has-text("E-Visa - *Tourist Single Entry")',
+                'mat-option:has-text("Tourist Single Entry")',
+                'mat-option:has-text("E-Visa")',
             ];
 
-            for (const selector of categorySelectors) {
-                try {
-                    const dropdown = this.page.locator(selector).first();
-                    if (await dropdown.isVisible({ timeout: 2000 })) {
-                        await dropdown.click({ force: true });
-                        console.log(`   ✅ Clicked category dropdown: ${selector}`);
-                        await delay(300);
-
-                        // Look for E-Visa Tourist Single Entry (id=JUV4)
-                        const optionStrategies = [
-                            () => this.page.locator('mat-option#JUV4').first(),
-                            () => this.page.locator('mat-option:has-text("E-Visa")').filter({ hasText: 'Tourist Single Entry' }).first(),
-                            () => this.page.locator('mat-option:has-text("Tourist Single Entry")').first(),
-                        ];
-
-                        for (const getOption of optionStrategies) {
-                            const option = getOption();
-                            if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
-                                const text = await option.textContent();
-                                await option.click({ force: true });
-                                console.log(`   ✅ Selected category: ${text?.trim()}`);
-                                await delay(300);
-                                return true;
-                            }
-                        }
-                    }
-                } catch {
-                    continue;
+            for (const selector of optionSelectors) {
+                const option = this.page.locator(selector).first();
+                if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    const text = await option.textContent();
+                    await option.click({ force: true });
+                    console.log(`   ✅ Selected category: ${text?.trim()}`);
+                    await delay(1000);
+                    return true;
                 }
             }
 
-            console.log('   ⚠️ Category dropdown not found');
+            // List all available options for debugging
+            const allOptions = await this.page.locator('mat-option').allTextContents();
+            console.log('   📋 Available options:', allOptions);
+
+            console.log('   ❌ Could not find category option');
             return false;
         } catch (error) {
-            console.log('   ⚠️ Error selecting category:', error);
+            console.log('   ❌ Error selecting category:', error);
             return false;
         }
     }
 
     /**
      * Select Sub-category based on config
-     * Note: After selecting Application Centre, "Short Stay" auto-selects
-     *       So sub-category is the 2nd dropdown we interact with (index 2)
+     * Japan uses JUSV7 for "Single Entry Tourism General"
      */
     private async selectSubCategory(): Promise<boolean> {
-        console.log('📁 Selecting Sub-category...');
+        console.log('   � Looking for Sub-category dropdown...');
 
         try {
-            // Find the third mat-select (Sub-category dropdown)
-            // Index: 0 = Centre, 1 = Category (auto), 2 = Sub-category
-            const dropdowns = this.page.locator('mat-select');
-            const dropdown = dropdowns.nth(2);
+            // Wait for page to be stable after category selection
+            await delay(1500);
 
-            if (!await dropdown.isVisible({ timeout: 5000 })) {
-                console.log('   ❌ Sub-category dropdown not found');
+            // Sub-category is the 3rd dropdown (mat-select at index 2, or use nth)
+            const dropdown = this.page.locator('mat-select').nth(2);
+
+            if (!await dropdown.isVisible({ timeout: 3000 })) {
+                console.log('   ❌ Sub-category dropdown not visible');
                 return false;
             }
 
-            // Click to open dropdown - fast direct click
+            // Click to open dropdown
             await dropdown.click({ force: true });
+            console.log('   ✅ Clicked sub-category dropdown');
 
-            // Wait for the dropdown panel to render
-            console.log('   ⏳ Waiting for dropdown panel...');
-            await delay(500);
+            // Wait for options panel to appear
+            await delay(2000);
 
-            // Wait for the overlay container with options to appear
+            // Wait for mat-option to be visible
             try {
-                await this.page.waitForSelector('.cdk-overlay-container mat-option', {
-                    state: 'visible',
-                    timeout: 5000
-                });
-                console.log('   ✅ Dropdown panel opened');
+                await this.page.waitForSelector('mat-option', { state: 'visible', timeout: 5000 });
+                console.log('   ✅ Options panel opened');
             } catch {
-                console.log('   ⚠️ Dropdown panel slow to open, retrying click...');
-                await this.behavior.naturalClick(dropdown);
-                await new Promise(r => setTimeout(r, 2000));
+                console.log('   ⚠️ Options panel not visible, retrying click...');
+                await dropdown.click({ force: true });
+                await delay(2000);
             }
 
             // Get the display text for the sub-category
