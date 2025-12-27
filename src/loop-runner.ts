@@ -17,7 +17,7 @@ import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegra
 
 // VFS URLs
 const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/mlt/dashboard';
-const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/mlt/login';
+const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/jpn/login';
 
 /**
  * Main Loop Runner Class
@@ -44,8 +44,8 @@ class LoopRunner {
             return;
         }
 
-        // Set timing mode
-        setTimingMode('balanced');
+        // Set timing mode - FAST for quick slot checks
+        setTimingMode('fast');
 
         // Send startup notification
         await sendStatusUpdate(`🚀 Bot started!\n\n📧 Accounts: ${loopConfig.accounts.length}\n🔁 Mode: ${loopConfig.mode}\n⏱️ Interval: ${loopConfig.intervalMinutes} min`);
@@ -114,6 +114,7 @@ class LoopRunner {
             return;
         }
         console.log('✅ Login successful');
+        await sendStatusUpdate(`✅ Logged in: ${account.email}`);
 
         // Check slots N times
         for (let slotCheck = 1; slotCheck <= loopConfig.slotsPerLogin; slotCheck++) {

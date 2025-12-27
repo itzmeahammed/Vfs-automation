@@ -24,6 +24,7 @@ import {
     SUB_CATEGORIES,
     type ApplicantDetails,
 } from '../config/applicant-config.js';
+import { delay } from '../config/timing-config.js';
 
 export interface BookingConfig {
     /** Sub-category to select: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family' */
@@ -258,13 +259,17 @@ export class VFSBookingFlow {
             }
             await this.takeScreenshot('centre-selected');
 
-            // Step 5: Wait for Angular to auto-populate "Short Stay" category
-            console.log('📂 Waiting for "Short Stay" to auto-select...');
-            await new Promise(r => setTimeout(r, 3000)); // Angular reactivity delay
-            console.log('   ✅ Category auto-selected');
+            // Step 5: Select Category dropdown (Japan doesn't auto-select like Malta)
+            console.log('📂 Selecting Category...');
+            await delay(1000);
+            const categorySelected = await this.selectCategory();
+            if (!categorySelected) {
+                console.log('   ⚠️ Category selection failed, continuing anyway...');
+            }
+            console.log('   ✅ Category selected');
 
             // Step 6: Wait for Sub-category dropdown & select
-            await new Promise(r => setTimeout(r, 2000)); // Angular reactivity
+            await delay(1000);
             const subCategorySelected = await this.selectSubCategory();
             if (!subCategorySelected) {
                 await this.takeScreenshot('subcategory-selection-failed');
@@ -644,6 +649,52 @@ export class VFSBookingFlow {
 
         console.log('   ❌ Could not select Application Centre after all retries');
         return false;
+    }
+
+    /**
+     * Select Category dropdown (for Japan - doesn't auto-select)
+     * Looks for category dropdown and selects first available option
+     */
+    private async selectCategory(): Promise<boolean> {
+        console.log('   🔍 Looking for Category dropdown...');
+
+        try {
+            // Find the second mat-select (first is Application Centre, second is Category)
+            const categorySelectors = [
+                'mat-select:nth-of-type(2)',
+                'mat-form-field:has-text("Category") mat-select',
+                'mat-select#mat-select-1',
+            ];
+
+            for (const selector of categorySelectors) {
+                try {
+                    const dropdown = this.page.locator(selector).first();
+                    if (await dropdown.isVisible({ timeout: 2000 })) {
+                        await dropdown.click({ force: true });
+                        console.log(`   ✅ Clicked category dropdown: ${selector}`);
+                        await delay(500);
+
+                        // Wait for options and click first one
+                        const option = this.page.locator('mat-option').first();
+                        if (await option.isVisible({ timeout: 2000 })) {
+                            const text = await option.textContent();
+                            await option.click({ force: true });
+                            console.log(`   ✅ Selected category: ${text?.trim()}`);
+                            await delay(500);
+                            return true;
+                        }
+                    }
+                } catch {
+                    continue;
+                }
+            }
+
+            console.log('   ⚠️ Category dropdown not found');
+            return false;
+        } catch (error) {
+            console.log('   ⚠️ Error selecting category:', error);
+            return false;
+        }
     }
 
     /**
