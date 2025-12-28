@@ -334,87 +334,15 @@ export class VFSBookingFlow {
             await this.takeScreenshot('slot-detection');
 
             if (slotInfo) {
-                console.log(`\n🎯 Earliest slot: ${slotInfo}`);
+                console.log(`\n🎯 SLOTS FOUND:\n${slotInfo}`);
 
-                // Step 8: Click Continue button
-                console.log('\n➡️ Clicking Continue button...');
-                const continueClicked = await this.clickContinueButton();
-
-                if (!continueClicked) {
-                    await this.takeScreenshot('continue-button-failed');
-                    return {
-                        success: true,
-                        state: 'slot_found',
-                        message: `Slot found: ${slotInfo}, but could not click Continue`,
-                        earliestSlot: slotInfo,
-                    };
-                }
-                await this.takeScreenshot('continue-clicked');
-
-                // Step 9: Wait for Your Details page
-                console.log('\n📝 Waiting for Your Details page...');
-                const detailsPageLoaded = await this.waitForYourDetailsPage();
-
-                if (detailsPageLoaded) {
-                    await this.takeScreenshot('your-details-page');
-
-                    // Step 10: Fill the Your Details form
-                    const formFilled = await this.fillYourDetailsForm();
-                    await this.takeScreenshot('form-filled');
-
-                    if (formFilled) {
-                        // Step 11: Click Save button
-                        const saved = await this.clickSaveButton();
-                        await this.takeScreenshot('save-clicked');
-
-                        if (saved) {
-                            // Step 12: Wait for Summary page and click Continue
-                            const continuedFromSummary = await this.waitForSummaryAndContinue();
-                            await this.takeScreenshot('summary-page');
-
-                            if (continuedFromSummary) {
-                                // Step 13: Wait for Book Appointment page
-                                const bookAppointmentLoaded = await this.waitForBookAppointmentPage();
-                                await this.takeScreenshot('book-appointment-page');
-
-                                return {
-                                    success: true,
-                                    state: bookAppointmentLoaded ? 'book_appointment' : 'summary_page',
-                                    message: bookAppointmentLoaded
-                                        ? `Ready to book appointment! Slot: ${slotInfo}`
-                                        : `Summary complete, waiting for Book Appointment page. Slot: ${slotInfo}`,
-                                    earliestSlot: slotInfo,
-                                };
-                            }
-
-                            return {
-                                success: true,
-                                state: 'details_filled',
-                                message: `Form saved but could not continue from Summary. Slot: ${slotInfo}`,
-                                earliestSlot: slotInfo,
-                            };
-                        }
-
-                        return {
-                            success: true,
-                            state: 'details_page',
-                            message: `Form filled but Save failed. Slot: ${slotInfo}`,
-                            earliestSlot: slotInfo,
-                        };
-                    }
-
-                    return {
-                        success: true,
-                        state: 'details_page',
-                        message: `On Your Details page but form fill had issues. Slot: ${slotInfo}`,
-                        earliestSlot: slotInfo,
-                    };
-                }
-
+                // EARLIEST_SLOT MODE: Return immediately with slot info
+                // DO NOT click Continue or go to Your Details page
+                console.log('\n✅ Returning with slot info (EARLIEST_SLOT mode - no form filling)');
                 return {
                     success: true,
                     state: 'slot_found',
-                    message: `Slot found: ${slotInfo}, Continue clicked`,
+                    message: 'Slots found!',
                     earliestSlot: slotInfo,
                 };
             }
@@ -755,30 +683,40 @@ export class VFSBookingFlow {
 
         try {
             // Wait for page to be stable
-            await delay(1000);
+            await delay(1500);
 
             // Category is mat-select-2 (from user's image)
             const dropdown = this.page.locator('mat-select#mat-select-2');
 
-            if (!await dropdown.isVisible({ timeout: 3000 })) {
+            if (!await dropdown.isVisible({ timeout: 5000 })) {
                 console.log('   ❌ Category dropdown mat-select-2 not visible');
                 return false;
             }
 
-            // Click to open dropdown
-            await dropdown.click({ force: true });
-            console.log('   ✅ Clicked category dropdown');
+            // Click to open dropdown - try multiple times
+            for (let clickAttempt = 1; clickAttempt <= 3; clickAttempt++) {
+                await dropdown.click({ force: true });
+                console.log(`   ✅ Clicked category dropdown (attempt ${clickAttempt})`);
 
-            // Wait for options panel to appear
-            await delay(2000);
+                // Wait for options panel to appear
+                await delay(1500);
 
-            // Wait for mat-option to be visible
-            try {
-                await this.page.waitForSelector('mat-option', { state: 'visible', timeout: 5000 });
-                console.log('   ✅ Options panel opened');
-            } catch {
-                console.log('   ⚠️ Options panel not visible');
-                return false;
+                // Wait for mat-option to be visible
+                try {
+                    await this.page.waitForSelector('mat-option', { state: 'visible', timeout: 3000 });
+                    console.log('   ✅ Options panel opened');
+                    break; // Success, exit click loop
+                } catch {
+                    if (clickAttempt < 3) {
+                        console.log('   ⚠️ Options panel not visible, clicking again...');
+                        // Press Escape to close partial overlay
+                        await this.page.keyboard.press('Escape');
+                        await delay(500);
+                    } else {
+                        console.log('   ⚠️ Options panel not visible after 3 clicks');
+                        return false;
+                    }
+                }
             }
 
             // Click E-Visa Tourist Single Entry (id=JUV4)

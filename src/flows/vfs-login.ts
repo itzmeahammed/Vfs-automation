@@ -235,11 +235,11 @@ export class VFSLoginFlow {
             await this.page.goto(baseUrl + '/are/en/jpn/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
             console.log('   Humanizing: Scrolling and looking around...');
-            await this.behavior.idleBehavior(2000); // Mouse drift
+            await this.behavior.idleBehavior(800); // Quick mouse drift
             await this.behavior.naturalScroll('down', 'medium');
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 500));
             await this.behavior.naturalScroll('up', 'small');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 300));
 
             console.log('   ✅ Warm-up complete');
         } catch (e) {
@@ -309,7 +309,7 @@ export class VFSLoginFlow {
             // Wait for any input to be visible (ensure page is loaded)
             try {
                 console.log('   ⏳ Waiting for login form to appear...');
-                await this.page.waitForSelector('input[type="email"], input[type="text"]', { state: 'visible', timeout: 20000 });
+                await this.page.waitForSelector('input[type="email"], input[type="text"]', { state: 'visible', timeout: 8000 });
             } catch {
                 console.log('   ⚠️ Login form wait timed out - proceeding to search anyway');
             }
@@ -325,7 +325,7 @@ export class VFSLoginFlow {
             }
 
             // Move mouse around naturally before filling form
-            await this.behavior.idleBehavior(1500);
+            await this.behavior.idleBehavior(500);
 
             // Fill email with robust interaction (3 clicks)
             console.log('   📧 Entering email...');
@@ -359,9 +359,9 @@ export class VFSLoginFlow {
             if (turnstileHandled) {
                 console.log('   Turnstile clicked, waiting for verification...');
 
-                // Wait up to 15 seconds for verification to complete
+                // Wait up to 10 seconds for verification to complete (reduced from 15)
                 let verified = false;
-                for (let i = 0; i < 15; i++) {
+                for (let i = 0; i < 10; i++) {
                     await new Promise(r => setTimeout(r, 1000));
                     process.stdout.write('.');
 
@@ -402,12 +402,12 @@ export class VFSLoginFlow {
 
             console.log('   🎉 Congrats! Script ran successfully. Button clicked.');
 
-            // Wait for response
+            // Wait for response (reduced from 30s)
             console.log('⏳ Waiting for response...');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => { });
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
 
-            // Brief wait for page transition
-            await new Promise(r => setTimeout(r, 2000));
+            // Brief wait for page transition (reduced from 2s)
+            await new Promise(r => setTimeout(r, 800));
 
 
             // Analyze result

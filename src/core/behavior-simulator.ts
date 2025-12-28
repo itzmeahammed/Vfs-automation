@@ -494,9 +494,9 @@ export class BehaviorSimulator {
      * Perform a natural form submission flow
      */
     async submitForm(submitButton: Locator | ElementHandle): Promise<void> {
-        // Pre-submit review (humans double-check before submitting)
+        // Pre-submit review (fast mode - reduced delay)
         console.log('👀 Reviewing form before submission...');
-        await new Promise(r => setTimeout(r, this.timing.getThinkingPause('complex')));
+        await new Promise(r => setTimeout(r, this.timing.getThinkingPause('simple')));
 
         // Move to submit button with hesitation
         await this.naturalClick(submitButton, { hesitate: true, important: true });

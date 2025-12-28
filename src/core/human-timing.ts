@@ -20,9 +20,9 @@ export interface TimingConfig {
 const DEFAULT_CONFIG: TimingConfig = {
     minTypingDelay: 45,
     maxTypingDelay: 180,
-    minActionDelay: 600,
-    maxActionDelay: 2800,
-    thinkingPause: { min: 1200, max: 4500 },
+    minActionDelay: 400,
+    maxActionDelay: 1500,
+    thinkingPause: { min: 400, max: 1500 }, // Reduced from 1200-4500 for speed
     readingSpeed: 200, // Average human reads 200-250 WPM
 };
 
