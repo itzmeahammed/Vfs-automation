@@ -415,7 +415,10 @@ export class VFSBookingFlow {
             console.log('   📍 URL confirmed: dashboard page');
 
             // Wait a bit for Angular to render
-            await delay(2000);
+            await delay(500);
+
+            // Wait for any initial loader to disappear
+            await this.waitForLoaderToDisappear();
 
             // Try multiple approaches to find the button
             const buttonSelectors = [
@@ -523,7 +526,7 @@ export class VFSBookingFlow {
             console.log('   ✅ Clicked Start New Booking');
 
             // Wait for navigation
-            await delay(2000);
+            await delay(500);
 
             return true;
         } catch (error) {
@@ -654,14 +657,15 @@ export class VFSBookingFlow {
                 const optionText = this.config.applicationCentre || 'Malta Visa application center- Dubai';
 
                 // Try multiple strategies to find the option
+                // Try multiple strategies to find the option
                 const selectionStrategies = [
-                    // Strategy 1: Exact match
+                    // Strategy 1: Specific configured text
                     () => this.page.locator('mat-option').filter({ hasText: optionText }).first(),
-                    // Strategy 2: Contains Dubai
-                    () => this.page.locator('mat-option:has-text("Dubai")').first(),
-                    // Strategy 3: Contains Abu Dhabi
-                    () => this.page.locator('mat-option:has-text("Abu Dhabi")').first(),
-                    // Strategy 4: Any Malta option
+                    // Strategy 2: Malta + Dubai (if searching for Dubai)
+                    () => this.page.locator('mat-option:has-text("Malta"):has-text("Dubai")').first(),
+                    // Strategy 3: Malta + Abu Dhabi (if searching for Abu Dhabi)
+                    () => this.page.locator('mat-option:has-text("Malta"):has-text("Abu Dhabi")').first(),
+                    // Strategy 4: Just "Malta" (risky but better than just "Dubai")
                     () => this.page.locator('mat-option:has-text("Malta")').first(),
                 ];
 
@@ -949,7 +953,7 @@ export class VFSBookingFlow {
             console.log('   ✅ Clicked Continue');
 
             // Wait for navigation
-            await delay(2000);
+            await delay(500);
 
             return true;
         } catch (error) {
@@ -1030,18 +1034,17 @@ export class VFSBookingFlow {
 
         try {
             // Wait for form to be ready
-            await delay(2000);
+            // Wait for form to be ready - Fast
+            await delay(500);
 
             // ═══════════════════════════════════════════════════════════
             // FIRST NAME
             // ═══════════════════════════════════════════════════════════
             console.log('   📝 Filling First Name...');
             const firstNameInput = this.page.locator('input[placeholder*="first name" i], input[formcontrolname*="firstName" i]').first();
-            if (await firstNameInput.isVisible({ timeout: 5000 })) {
-                await this.behavior.robustFill(firstNameInput, applicant.firstName, 'First Name');
-            } else {
-                console.log('   ⚠️ First Name field not found');
-            }
+            // Critical wait for the first field to ensure form is rendered
+            await firstNameInput.waitFor({ state: 'visible', timeout: 10000 });
+            await firstNameInput.fill(applicant.firstName);
 
             // ═══════════════════════════════════════════════════════════
             // LAST NAME
@@ -1049,7 +1052,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling Last Name...');
             const lastNameInput = this.page.locator('input[placeholder*="last name" i], input[formcontrolname*="lastName" i]').first();
             if (await lastNameInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(lastNameInput, applicant.lastName, 'Last Name');
+                await lastNameInput.fill(applicant.lastName);
             } else {
                 console.log('   ⚠️ Last Name field not found');
             }
@@ -1066,7 +1069,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling Passport Number...');
             const passportInput = this.page.locator('input[placeholder*="passport" i], input[formcontrolname*="passport" i]').first();
             if (await passportInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(passportInput, applicant.passportNumber, 'Passport Number');
+                await passportInput.fill(applicant.passportNumber);
             } else {
                 console.log('   ⚠️ Passport Number field not found');
             }
@@ -1089,8 +1092,8 @@ export class VFSBookingFlow {
             for (const selector of phoneCodeSelectors) {
                 try {
                     const input = this.page.locator(selector).first();
-                    if (await input.isVisible({ timeout: 2000 })) {
-                        await this.behavior.robustFill(input, applicant.phoneCode, 'Phone Code');
+                    if (await input.isVisible()) {
+                        await input.fill(applicant.phoneCode);
                         console.log('   ✅ Phone code filled');
                         break;
                     }
@@ -1110,8 +1113,8 @@ export class VFSBookingFlow {
             for (const selector of phoneNumberSelectors) {
                 try {
                     const input = this.page.locator(selector).first();
-                    if (await input.isVisible({ timeout: 2000 })) {
-                        await this.behavior.robustFill(input, applicant.phoneNumber, 'Phone Number');
+                    if (await input.isVisible()) {
+                        await input.fill(applicant.phoneNumber);
                         console.log('   ✅ Phone number filled');
                         break;
                     }
@@ -1126,7 +1129,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling Email...');
             const emailInput = this.page.locator('input[placeholder*="email" i], input[type="email"], input[formcontrolname*="email" i]').first();
             if (await emailInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(emailInput, applicant.email, 'Email');
+                await emailInput.fill(applicant.email);
             } else {
                 console.log('   ⚠️ Email field not found');
             }
@@ -1137,19 +1140,40 @@ export class VFSBookingFlow {
             console.log('   📝 Filling Address Line 1...');
             const address1Input = this.page.locator('input[placeholder*="address line 1" i], input[formcontrolname*="addressLine1" i]').first();
             if (await address1Input.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(address1Input, applicant.addressLine1, 'Address Line 1');
+                await address1Input.fill(applicant.addressLine1);
             }
 
             // ═══════════════════════════════════════════════════════════
             // ADDRESS LINE 2 (Optional)
             // ═══════════════════════════════════════════════════════════
-            if (applicant.addressLine2) {
-                console.log('   📝 Filling Address Line 2...');
-                const address2Input = this.page.locator('input[placeholder*="address line 2" i], input[formcontrolname*="addressLine2" i]').first();
-                if (await address2Input.isVisible({ timeout: 3000 })) {
-                    await this.behavior.robustFill(address2Input, applicant.addressLine2, 'Address Line 2');
-                }
+            // ═══════════════════════════════════════════════════════════
+            // ADDRESS LINE 2 (Optional but sometimes required)
+            // ═══════════════════════════════════════════════════════════
+            // Always try to fill if visible, using 'Dubai' as fallback if empty in config
+            const addr2Value = applicant.addressLine2 || applicant.addressLine1 || 'Dubai';
+            console.log(`   📝 Filling Address Line 2 (Value: ${addr2Value})...`);
+
+            const address2Selectors = [
+                // User provided XPath
+                'xpath=/html/body/app-root/div/main/div/app-applicant-details/section/mat-card[1]/form/app-dynamic-form/div/div/app-dynamic-control[21]/div/div/div/app-input-control/div/mat-form-field/div[1]/div/div[2]/input',
+                'input[placeholder*="address line 2" i]',
+                'input[formcontrolname*="addressLine2" i]',
+                // Generic fallback for strict position if needed
+                'app-dynamic-control:nth-of-type(21) input'
+            ];
+
+            let addr2Filled = false;
+            for (const selector of address2Selectors) {
+                try {
+                    const input = this.page.locator(selector).first();
+                    if (await input.isVisible({ timeout: 1000 })) { // Short timeout
+                        await input.fill(addr2Value);
+                        addr2Filled = true;
+                        break;
+                    }
+                } catch { continue; }
             }
+            if (!addr2Filled) console.log('   ⚠️ Address Line 2 input not found');
 
             // ═══════════════════════════════════════════════════════════
             // STATE
@@ -1157,7 +1181,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling State...');
             const stateInput = this.page.locator('input[placeholder*="state" i], input[formcontrolname*="state" i]').first();
             if (await stateInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(stateInput, applicant.state, 'State');
+                await stateInput.fill(applicant.state);
             }
 
             // ═══════════════════════════════════════════════════════════
@@ -1166,7 +1190,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling City...');
             const cityInput = this.page.locator('input[placeholder*="city" i], input[formcontrolname*="city" i]').first();
             if (await cityInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(cityInput, applicant.city, 'City');
+                await cityInput.fill(applicant.city);
             }
 
             // ═══════════════════════════════════════════════════════════
@@ -1175,7 +1199,7 @@ export class VFSBookingFlow {
             console.log('   📝 Filling Postcode...');
             const postcodeInput = this.page.locator('input[placeholder*="postcode" i], input[placeholder*="postal" i], input[formcontrolname*="postCode" i]').first();
             if (await postcodeInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(postcodeInput, applicant.postcode, 'Postcode');
+                await postcodeInput.fill(applicant.postcode);
             }
 
             console.log('\n   ✅ Form filled successfully!');
@@ -1215,138 +1239,83 @@ export class VFSBookingFlow {
             try {
                 console.log(`   📍 Nationality attempt ${attempt}/${maxRetries}...`);
 
-                // First check if already selected
-                const currentValue = await this.page.locator('mat-form-field:has-text("Nationality") .mat-mdc-select-value-text, mat-select#mat-select-3 .mat-mdc-select-value-text').first().textContent().catch(() => '');
+                // 1. Check if already selected
+                const currentValue = await this.page.locator('mat-form-field:has-text("Nationality") .mat-mdc-select-value-text').first().textContent().catch(() => '');
                 if (currentValue?.toUpperCase().includes(nationalityUpper)) {
                     console.log(`   ✅ Nationality already selected: ${currentValue}`);
                     return true;
                 }
 
-                // Find and click the nationality dropdown
+                // 2. Find Dropdown (Prioritizing User XPath)
                 const dropdownSelectors = [
+                    'xpath=/html/body/app-root/div/main/div/app-applicant-details/section/mat-card[1]/form/app-dynamic-form/div/div/app-dynamic-control[10]/div/div/div/app-dropdown/div/mat-form-field/div[1]/div/div[2]/mat-select',
                     'mat-form-field:has-text("Nationality") mat-select',
-                    'mat-form-field:has-text("Current Nationality") mat-select',
-                    'mat-select#mat-select-3',
-                    'app-input-control:has-text("Nationality") mat-select',
-                    // More generic - find the 3rd or 4th mat-select on the page
                     'mat-select:nth-of-type(3)',
                 ];
 
-                let dropdownClicked = false;
                 let dropdown: Locator | null = null;
-
                 for (const selector of dropdownSelectors) {
-                    try {
-                        const d = this.page.locator(selector).first();
-                        if (await d.isVisible({ timeout: 1000 })) {
-                            dropdown = d;
-                            // Direct click only (no naturalClick - causes scrolling)
-                            await d.click({ force: true });
-                            dropdownClicked = true;
-                            console.log(`   ✅ Clicked dropdown: ${selector}`);
-                            break;
-                        }
-                    } catch {
-                        continue;
+                    const d = this.page.locator(selector).first();
+                    if (await d.isVisible({ timeout: 500 })) {
+                        dropdown = d;
+                        await d.click({ force: true });
+                        console.log(`   ✅ Clicked dropdown`);
+                        break;
                     }
                 }
 
-                if (!dropdownClicked) {
-                    console.log('   ⚠️ Could not find nationality dropdown, clicking outside to reset...');
-                    // Click outside to close any open overlay/dropdown
-                    await this.page.click('body', { position: { x: 100, y: 100 } });
-                    await delay(500);
+                if (!dropdown) {
+                    console.log('   ⚠️ Dropdown not found');
                     continue;
                 }
 
-                // Wait for panel to open
-                await delay(500);
+                // Wait slightly for panel
+                // await delay(200); // Removed for speed
 
-                // Check if panel is visible
-                const panelVisible = await this.page.locator('#mat-select-3-panel mat-option, .cdk-overlay-container mat-option').first().isVisible({ timeout: 3000 }).catch(() => false);
+                // 3. Select Option (User Strategy: Option 231)
+                // Also check text as backup
+                const strategies = [
+                    // User XPath (Option 231)
+                    () => this.page.locator('xpath=/html/body/div[4]/div[2]/div/div/mat-option[231]'),
+                    // Text Exact
+                    () => this.page.locator(`mat-option:has(span:text-is("${nationalityUpper}"))`).first(),
+                    // Text Contains
+                    () => this.page.locator(`mat-option:has-text("${nationalityUpper}")`).first()
+                ];
 
-                if (!panelVisible) {
-                    console.log('   ⚠️ Panel not visible, clicking dropdown again...');
-                    if (dropdown) {
-                        await dropdown.click({ force: true });
-                        await delay(300);
+                let clicked = false;
+                for (const getOpt of strategies) {
+                    const opt = getOpt();
+                    if (await opt.isVisible()) {
+                        // Scroll into view
+                        // await opt.scrollIntoViewIfNeeded(); // Removed for speed
+                        await opt.click({ force: true });
+                        console.log('   ✅ Clicked option');
+                        clicked = true;
+                        break;
                     }
                 }
 
-                // Now try to find and click the option
-                // Strategy 1: Direct text match
-                console.log(`   🔍 Looking for option: "${nationalityUpper}"...`);
-
-                const exactOption = this.page.locator(`mat-option:has(span:text-is("${nationalityUpper}"))`).first();
-                if (await exactOption.isVisible({ timeout: 1500 }).catch(() => false)) {
-                    await exactOption.click();
-                    console.log(`   ✅ Clicked exact match option`);
-                    await delay(300);
-
-                    // Verify selection
-                    if (await this.verifyNationalitySelected(nationalityUpper)) {
-                        return true;
-                    }
+                if (clicked) {
+                    // Fast verify
+                    // await delay(200); // Removed for speed
+                    if (await this.verifyNationalitySelected(nationalityUpper)) return true;
+                } else {
+                    // Fallback: iterate (fast)
+                    // ... skipped for speed unless needed
+                    console.log('   ⚠️ Option not found via strategies');
                 }
 
-                // Strategy 2: Contains text match
-                const containsOption = this.page.locator(`mat-option:has-text("${nationalityUpper}")`).first();
-                if (await containsOption.isVisible({ timeout: 1500 }).catch(() => false)) {
-                    await containsOption.click();
-                    console.log(`   ✅ Clicked contains match option`);
-                    await delay(300);
-
-                    if (await this.verifyNationalitySelected(nationalityUpper)) {
-                        return true;
-                    }
-                }
-
-                // Strategy 3: Iterate through all visible options
-                const allOptions = await this.page.locator('.cdk-overlay-container mat-option, #mat-select-3-panel mat-option').all();
-                console.log(`   📋 Found ${allOptions.length} options in panel`);
-
-                for (const opt of allOptions) {
-                    try {
-                        const optText = await opt.textContent();
-                        const cleanText = optText?.trim().toUpperCase() || '';
-
-                        if (cleanText === nationalityUpper || cleanText.includes(nationalityUpper)) {
-                            console.log(`   🎯 Found matching option: "${cleanText}"`);
-
-                            // Scroll into view first
-                            await opt.scrollIntoViewIfNeeded();
-                            await delay(2000);
-
-                            // Click it
-                            await opt.click();
-                            console.log(`   ✅ Clicked option`);
-                            await delay(2000);
-
-                            if (await this.verifyNationalitySelected(nationalityUpper)) {
-                                return true;
-                            }
-                        }
-                    } catch (e) {
-                        continue;
-                    }
-                }
-
-                // Close dropdown before retry
+                // Close if failed
                 await this.page.keyboard.press('Escape');
-                await delay(2000);
 
             } catch (error) {
-                console.log(`   ⚠️ Attempt ${attempt} failed:`, error);
+                console.log(`   ⚠️ Error:`, error);
                 await this.page.keyboard.press('Escape').catch(() => { });
             }
-
-            if (attempt < maxRetries) {
-                console.log('   🔄 Retrying nationality selection...');
-                await delay(2000);
-            }
+            // Retry fast
+            // await delay(500); // Removed for speed
         }
-
-        console.log(`   ❌ Could not select nationality: ${nationality}`);
         return false;
     }
 
@@ -1355,7 +1324,8 @@ export class VFSBookingFlow {
      */
     private async verifyNationalitySelected(expectedNationality: string): Promise<boolean> {
         try {
-            await delay(300);
+            // Fast check
+            // await delay(300);
 
             // Check the displayed value in the mat-select
             const valueSelectors = [
@@ -1633,7 +1603,7 @@ export class VFSBookingFlow {
                         console.log('   ✅ Clicked Continue');
 
                         // Wait for navigation
-                        await delay(3000);
+                        await delay(1000);
                     } else {
                         console.log('   ⚠️ Continue button not visible');
                         await delay(2000);
@@ -1642,7 +1612,7 @@ export class VFSBookingFlow {
             }
 
             // Final wait and URL check
-            await delay(5000);
+            await delay(1000);
             const finalUrl = this.page.url();
 
             if (finalUrl.includes('/book-appointment')) {

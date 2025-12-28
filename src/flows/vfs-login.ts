@@ -95,8 +95,8 @@ export class VFSLoginFlow {
             await this.handleCookieConsent();
 
             // Step 4: Human reading/orientation pause
-            console.log('👀 Observing page layout...');
-            await new Promise(r => setTimeout(r, this.timing.getThinkingPause('moderate')));
+            // Step 4: Quick pause
+            await delay(100);
 
             // Step 5: Fill and submit login form (with retry)
             let loginResult: LoginResult = { success: false, state: 'failed', message: 'Not attempted' };
@@ -235,12 +235,8 @@ export class VFSLoginFlow {
             const baseUrl = new URL(this.config.loginUrl).origin;
             await this.page.goto(baseUrl + '/are/en/mlt/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-            console.log('   Humanizing: Scrolling and looking around...');
-            await this.behavior.idleBehavior(2000); // Mouse drift
-            await this.behavior.naturalScroll('down', 'medium');
-            await delay(2000);
-            await this.behavior.naturalScroll('up', 'small');
-            await delay(2000);
+            console.log('   (Skipped warm-up for speed)');
+            await delay(100);
 
             console.log('   ✅ Warm-up complete');
         } catch (e) {
@@ -283,7 +279,8 @@ export class VFSLoginFlow {
         console.log('🍪 Checking for cookie consent...');
 
         // Brief pause to "notice" the banner
-        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+        // Fast check
+        await delay(100);
 
         const handled = await this.uiHandler.handleVFSCookieConsent();
 
@@ -326,14 +323,12 @@ export class VFSLoginFlow {
             }
 
             // Move mouse around naturally before filling form
-            await this.behavior.idleBehavior(1500);
+            // await this.behavior.idleBehavior(1500); // Removed for speed
 
             // Fill email with robust interaction (3 clicks)
+            // Fill email INSTANTLY (Native fill)
             console.log('   📧 Entering email...');
-            await this.behavior.robustFill(emailInput, credentials.email, 'Email');
-
-            // Pause between fields (like a real user)
-            await new Promise(r => setTimeout(r, this.timing.getActionDelay('focus')));
+            await emailInput.fill(credentials.email);
 
             // Find password input
             const passwordInput = await this.findLoginField('password');
@@ -345,13 +340,13 @@ export class VFSLoginFlow {
                 };
             }
 
-            // Fill password with robust interaction (3 clicks)
+            // Fill password INSTANTLY (Native fill)
             console.log('   🔑 Entering password...');
-            await this.behavior.robustFill(passwordInput, credentials.password, 'Password');
+            await passwordInput.fill(credentials.password);
 
             // Pre-submit review pause (humans double-check)
-            console.log('\n   👀 Reviewing form...');
-            await new Promise(r => setTimeout(r, this.timing.getThinkingPause('complex')));
+            // Pre-submit review (Skipped for speed)
+            await delay(100);
 
             // Handle Cloudflare Turnstile checkbox
             console.log('   Looking for Cloudflare Turnstile...');
@@ -363,7 +358,7 @@ export class VFSLoginFlow {
                 // Wait up to 15 seconds for verification to complete
                 let verified = false;
                 for (let i = 0; i < 15; i++) {
-                    await delay(2000);
+                    await delay(1000);
                     process.stdout.write('.');
 
                     // Check if Sign In button is enabled (indicates verification success)
@@ -404,11 +399,28 @@ export class VFSLoginFlow {
             console.log('   🎉 Congrats! Script ran successfully. Button clicked.');
 
             // Wait for response
-            console.log('⏳ Waiting for response...');
-            await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => { });
+            // Wait for response (Shortened)
+            // Wait for response (Increased as per user request to ensure dashboard loads)
+            // Wait for response with smart polling
+            console.log('⏳ Waiting for dashboard to appear...');
+
+            // Poll for dashboard URL or content
+            let onDashboard = false;
+            for (let i = 0; i < 30; i++) { // Max 15 seconds
+                const url = this.page.url();
+                if (url.includes('dashboard') ||
+                    url.includes('application-center') ||
+                    await this.page.locator('button:has-text("Start New Booking")').isVisible().catch(() => false)) {
+                    console.log('   ✅ Dashboard detected!');
+                    onDashboard = true;
+                    break;
+                }
+                await delay(500);
+            }
+            if (!onDashboard) console.log('   ⚠️ Dashboard wait timeout - checking anyway...');
 
             // Brief wait for page transition
-            await delay(2000);
+            await delay(500);
 
 
             // Analyze result
@@ -781,7 +793,7 @@ export class VFSLoginFlow {
      */
     private async analyzeLoginResult(): Promise<LoginResult> {
         // Wait for page to stabilize
-        await delay(2000);
+        await delay(500);
 
         const pageUrl = this.page.url();
         const pageTitle = await this.page.title();

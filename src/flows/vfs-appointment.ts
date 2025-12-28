@@ -341,7 +341,8 @@ export class VFSAppointmentFlow {
 
                         await this.behavior.naturalClick(nextBtn);
                         console.log('   ➡️ Clicked next month button');
-                        await delay(2000);
+                        console.log('   ⏳ Waiting 10s to avoid Rate Limit (429)...');
+                        await delay(10000);
                         return true;
                     }
                 } catch {
@@ -353,7 +354,8 @@ export class VFSAppointmentFlow {
             if (await anyNextBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await anyNextBtn.click({ force: true });
                 console.log('   ➡️ Force clicked next month');
-                await delay(2000);
+                console.log('   ⏳ Waiting 10s to avoid Rate Limit (429)...');
+                await delay(10000);
                 return true;
             }
 
@@ -451,46 +453,13 @@ export class VFSAppointmentFlow {
         try {
             console.log('   🔍 Looking for Continue button...');
 
-            const buttonSelectors = [
-                'button.btn-brand-orange:has(span.mdc-button__label:has-text("Continue"))',
-                'button.btn-brand-orange.btn-block:has-text("Continue")',
-                'button.btn-brand-orange:has-text("Continue")',
-                'button:has-text("Continue"):not(:has-text("Go Back"))',
-            ];
-
-            for (const selector of buttonSelectors) {
-                try {
-                    const button = this.page.locator(selector).first();
-                    if (await button.isVisible({ timeout: 3000 })) {
-                        const isDisabled = await button.isDisabled().catch(() => false);
-                        if (isDisabled) {
-                            console.log(`   ⚠️ Continue button disabled`);
-                            continue;
-                        }
-
-                        await button.scrollIntoViewIfNeeded();
-                        await delay(2000);
-
-                        await this.behavior.naturalClick(button);
-                        console.log('   ✅ Clicked Continue');
-
-                        await delay(2000);
-                        await this.checkAndHandleCaptcha();
-                        await delay(2000);
-                        return true;
-                    }
-                } catch {
-                    continue;
-                }
-            }
-
             const anyButton = this.page.locator('button:has-text("Continue")').first();
             if (await anyButton.isVisible({ timeout: 2000 }).catch(() => false)) {
                 const isDisabled = await anyButton.isDisabled().catch(() => false);
                 if (!isDisabled) {
                     await anyButton.click({ force: true });
                     console.log('   ✅ Force clicked Continue');
-                    await delay(2000);
+                    await delay(500);
                     return true;
                 }
             }
@@ -533,11 +502,18 @@ export class VFSAppointmentFlow {
             await this.checkAndHandleCaptcha();
 
             // Click Continue button
-            const continueClicked = await this.clickContinueButton();
+            // Click Continue button with retry
+            let continueClicked = await this.clickContinueButton();
+
+            // Fast Check: if still on services page, retry
+            await delay(1500);
+            if (this.page.url().includes('services')) {
+                console.log('   ⚠️ Still on Services page, retrying Continue...');
+                continueClicked = await this.clickContinueButton();
+            }
 
             if (continueClicked) {
                 console.log('   ✅ Passed Services page');
-                await delay(2000);
                 return true;
             }
 
@@ -656,45 +632,65 @@ export class VFSAppointmentFlow {
             // Click the required checkboxes
             console.log('\n   ☑️ Clicking required checkboxes...');
 
-            // Checkbox 1: Terms and Conditions (mat-mdc-checkbox-0)
+            // Checkbox 1: Terms and Conditions
             try {
-                const termsCheckbox = this.page.locator('#mat-mdc-checkbox-0-input, mat-checkbox#mat-mdc-checkbox-0 input, mat-checkbox:has-text("Terms and Conditions") input').first();
-                if (await termsCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
+                // User provided XPath: /html/body/app-root/div/main/div/app-review-and-payment/section/form/mat-card[1]/div[9]/mat-checkbox/div/div/input
+                const termsXPath = '/html/body/app-root/div/main/div/app-review-and-payment/section/form/mat-card[1]/div[9]/mat-checkbox/div/div/input';
+                const termsCheckbox = this.page.locator(`input[id*="checkbox-0"], input[id*="terms"], xpath=${termsXPath}`).first();
+
+                if (await termsCheckbox.count() > 0 && await termsCheckbox.isVisible({ timeout: 1000 })) {
                     await termsCheckbox.click({ force: true });
                     console.log('   ✅ Clicked Terms and Conditions checkbox');
                 } else {
-                    // Try clicking the mat-checkbox element directly
-                    const termsBox = this.page.locator('mat-checkbox#mat-mdc-checkbox-0, mat-checkbox:has-text("Terms")').first();
-                    if (await termsBox.isVisible({ timeout: 2000 }).catch(() => false)) {
-                        await termsBox.click({ force: true });
-                        console.log('   ✅ Clicked Terms checkbox (via mat-checkbox)');
+                    // Try the specific XPath directly if locator compilation feels ambiguous or sequential fallback
+                    const xpLocator = this.page.locator(termsXPath).first();
+                    if (await xpLocator.isVisible({ timeout: 500 }).catch(() => false)) {
+                        await xpLocator.click({ force: true });
+                        console.log('   ✅ Clicked Terms checkbox (XPath)');
+                    } else {
+                        // Fallback to generic
+                        const genericTerms = this.page.locator('mat-checkbox:has-text("Terms") input').first();
+                        if (await genericTerms.isVisible({ timeout: 500 }).catch(() => false)) {
+                            await genericTerms.click({ force: true });
+                            console.log('   ✅ Clicked Terms checkbox (Generic)');
+                        }
                     }
                 }
             } catch (e) {
                 console.log('   ⚠️ Could not click Terms checkbox:', e);
             }
 
-            await delay(500);
+            await delay(200);
 
-            // Checkbox 2: Marketing communication (mat-mdc-checkbox-1)
+            // Checkbox 2: Marketing/Other
             try {
-                const marketingCheckbox = this.page.locator('#mat-mdc-checkbox-1-input, mat-checkbox#mat-mdc-checkbox-1 input, mat-checkbox:has-text("receive future communication") input').first();
-                if (await marketingCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-                    await marketingCheckbox.click({ force: true });
-                    console.log('   ✅ Clicked Marketing communication checkbox');
+                // User provided XPath: /html/body/app-root/div/main/div/app-review-and-payment/section/form/mat-card[1]/div[8]/div/mat-checkbox/div/div/input
+                const otherXPath = '/html/body/app-root/div/main/div/app-review-and-payment/section/form/mat-card[1]/div[8]/div/mat-checkbox/div/div/input';
+                const otherCheckbox = this.page.locator(`input[id*="checkbox-1"], xpath=${otherXPath}`).first();
+
+                if (await otherCheckbox.count() > 0 && await otherCheckbox.isVisible({ timeout: 1000 })) {
+                    await otherCheckbox.click({ force: true });
+                    console.log('   ✅ Clicked Second checkbox');
                 } else {
-                    // Try clicking the mat-checkbox element directly
-                    const marketingBox = this.page.locator('mat-checkbox#mat-mdc-checkbox-1, mat-checkbox:has-text("communication")').first();
-                    if (await marketingBox.isVisible({ timeout: 2000 }).catch(() => false)) {
-                        await marketingBox.click({ force: true });
-                        console.log('   ✅ Clicked Marketing checkbox (via mat-checkbox)');
+                    // Try the specific XPath directly
+                    const xpLocator = this.page.locator(otherXPath).first();
+                    if (await xpLocator.isVisible({ timeout: 500 }).catch(() => false)) {
+                        await xpLocator.click({ force: true });
+                        console.log('   ✅ Clicked Second checkbox (XPath)');
+                    } else {
+                        // Fallback
+                        const genericBox = this.page.locator('mat-checkbox:has-text("communication") input, mat-checkbox:nth-of-type(2) input').first();
+                        if (await genericBox.isVisible({ timeout: 500 }).catch(() => false)) {
+                            await genericBox.click({ force: true });
+                            console.log('   ✅ Clicked Second checkbox (Generic)');
+                        }
                     }
                 }
             } catch (e) {
-                console.log('   ⚠️ Could not click Marketing checkbox:', e);
+                console.log('   ⚠️ Could not click Second checkbox:', e);
             }
 
-            await delay(1000);
+            await delay(200);
 
             console.log('\n   🎉 BOOKING READY FOR FINAL CONFIRMATION!');
             console.log('   ⚠️ Manual payment required to complete booking.\n');

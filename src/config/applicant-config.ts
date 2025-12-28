@@ -48,19 +48,19 @@ export interface VFSConfig {
 export const vfsConfig: VFSConfig = {
     applicant: {
         // Personal Information (EXACTLY as shown on passport)
-        firstName: 'JOHN',
-        lastName: 'DOE',
-        passportNumber: 'AB1234567',
-        nationality: 'INDIA',  // Use UPPERCASE (e.g., INDIA, PAKISTAN, PHILIPPINES)
+        firstName: 'AHAMMED',
+        lastName: 'TEST', // Updates as needed
+        passportNumber: 'N12345678',
+        nationality: 'UNITED ARAB EMIRATES',  // Use UPPERCASE (e.g., INDIA, PAKISTAN, PHILIPPINES)
 
         // Contact Information
-        email: 'john.doe@example.com',
+        email: 'ahammed@example.com',
         phoneCode: '971',      // UAE country code (without +)
         phoneNumber: '501234567',
 
         // Address Information
-        addressLine1: '123 Street Name, Building Name',
-        addressLine2: 'Apartment 101',  // Optional - can be empty string
+        addressLine1: 'Dubai',
+        addressLine2: '',  // Optional - can be empty string
         state: 'Dubai',
         city: 'Dubai',
         postcode: '00000',
