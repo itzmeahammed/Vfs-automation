@@ -234,12 +234,12 @@ export class VFSLoginFlow {
             const baseUrl = new URL(this.config.loginUrl).origin;
             await this.page.goto(baseUrl + '/are/en/jpn/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-            console.log('   Humanizing: Scrolling and looking around...');
-            await this.behavior.idleBehavior(800); // Quick mouse drift
+            console.log('   Humanizing: Quick scroll and look...');
+            await this.behavior.idleBehavior(400); // Faster mouse drift
             await this.behavior.naturalScroll('down', 'medium');
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 200));
             await this.behavior.naturalScroll('up', 'small');
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 150));
 
             console.log('   ✅ Warm-up complete');
         } catch (e) {
@@ -359,9 +359,9 @@ export class VFSLoginFlow {
             if (turnstileHandled) {
                 console.log('   Turnstile clicked, waiting for verification...');
 
-                // Wait up to 10 seconds for verification to complete (reduced from 15)
+                // Wait up to 2 seconds for verification (fast mode)
                 let verified = false;
-                for (let i = 0; i < 10; i++) {
+                for (let i = 0; i < 2; i++) {
                     await new Promise(r => setTimeout(r, 1000));
                     process.stdout.write('.');
 

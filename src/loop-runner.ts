@@ -132,9 +132,12 @@ class LoopRunner {
                         console.log('📋 Full scenario mode - continuing booking...');
                         // TODO: Continue with full booking flow
                     }
+                } else if (slotResult.error) {
+                    console.log(`   ⚠️ Failed: ${slotResult.error}`);
+                    await sendStatusUpdate(`⚠️ Failed: ${slotResult.error}\\n📧 ${account.email}`);
                 } else {
-                    console.log('   ❌ No slot found');
-                    await sendStatusUpdate(`❌ No slot - Check ${slotCheck}/${loopConfig.slotsPerLogin}\n📧 ${account.email}`);
+                    console.log('   ❌ No slot available');
+                    await sendStatusUpdate(`❌ No slot - Check ${slotCheck}/${loopConfig.slotsPerLogin}\\n📧 ${account.email}`);
                 }
 
                 // Go back to dashboard for next check (if not last)
@@ -155,17 +158,23 @@ class LoopRunner {
     /**
      * Check earliest slot - goes through booking flow until slot detection
      */
-    private async checkEarliestSlot(): Promise<{ found: boolean; date?: string }> {
-        if (!this.page) return { found: false };
+    private async checkEarliestSlot(): Promise<{ found: boolean; date?: string; error?: string }> {
+        if (!this.page) return { found: false, error: 'No page available' };
 
-        const bookingFlow = new VFSBookingFlow(this.page);
+        // Pass the mode from loopConfig to booking flow
+        const bookingFlow = new VFSBookingFlow(this.page, { mode: loopConfig.mode });
         const result = await bookingFlow.execute();
 
         if (result.success && result.earliestSlot) {
             return { found: true, date: result.earliestSlot };
         }
 
-        return { found: false };
+        // Distinguish between error and no slot
+        if (!result.success) {
+            return { found: false, error: result.message };
+        }
+
+        return { found: false };  // Success but no slot
     }
 
     /**

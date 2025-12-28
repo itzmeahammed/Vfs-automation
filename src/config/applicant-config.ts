@@ -10,7 +10,10 @@ export interface ApplicantDetails {
     // Personal Information (as per passport)
     firstName: string;
     lastName: string;
+    gender: 'Male' | 'Female' | 'Other';
+    dateOfBirth: string; // Format: DD/MM/YYYY
     passportNumber: string;
+    passportExpiry: string; // Format: DD/MM/YYYY
     nationality: string;  // e.g., "INDIA", "PAKISTAN", "PHILIPPINES"
 
     // Contact Information
@@ -50,7 +53,10 @@ export const vfsConfig: VFSConfig = {
         // Personal Information (EXACTLY as shown on passport)
         firstName: 'JOHN',
         lastName: 'DOE',
+        gender: 'Male',
+        dateOfBirth: '01/01/1990', // DD/MM/YYYY
         passportNumber: 'AB1234567',
+        passportExpiry: '01/01/2030', // DD/MM/YYYY
         nationality: 'INDIA',  // Use UPPERCASE (e.g., INDIA, PAKISTAN, PHILIPPINES)
 
         // Contact Information

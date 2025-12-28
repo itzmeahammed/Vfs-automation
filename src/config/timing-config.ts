@@ -66,21 +66,21 @@ const BALANCED_TIMING: TimingConfig = {
 };
 
 const FAST_TIMING: TimingConfig = {
-    pageLoad: 500,
-    angularRender: 300,
-    beforeClick: 50,
-    afterClick: 200,
-    betweenActions: 100,
-    beforeTyping: 30,
-    afterTyping: 50,
-    betweenFields: 100,
-    dropdownOpen: 200,
-    dropdownSelect: 150,
-    captchaWait: 3000,
-    afterCaptcha: 500,
-    retryDelay: 300,
-    selectorTimeout: 1000,
-    visibilityTimeout: 500,
+    pageLoad: 300,        // Reduced from 500
+    angularRender: 200,   // Reduced from 300
+    beforeClick: 30,      // Reduced from 50
+    afterClick: 100,      // Reduced from 200
+    betweenActions: 50,   // Reduced from 100
+    beforeTyping: 20,     // Reduced from 30
+    afterTyping: 30,      // Reduced from 50
+    betweenFields: 50,    // Reduced from 100
+    dropdownOpen: 150,    // Reduced from 200
+    dropdownSelect: 100,  // Reduced from 150
+    captchaWait: 2000,    // Reduced from 3000
+    afterCaptcha: 300,    // Reduced from 500
+    retryDelay: 200,      // Reduced from 300
+    selectorTimeout: 800, // Reduced from 1000
+    visibilityTimeout: 400, // Reduced from 500
 };
 
 let currentMode: TimingMode = 'balanced';

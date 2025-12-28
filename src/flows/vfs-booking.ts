@@ -33,6 +33,8 @@ export interface BookingConfig {
     applicationCentre?: string;
     /** Applicant details for form filling */
     applicant?: ApplicantDetails;
+    /** Booking mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking) */
+    mode?: 'earliest_slot' | 'full_scenario';
 }
 
 export interface BookingResult {
@@ -317,9 +319,8 @@ export class VFSBookingFlow {
             await this.takeScreenshot('subcategory-selected');
 
             // Wait for loader to disappear after sub-category selection
-            console.log('\n   ⏳ Waiting 10 seconds for slot info to load...');
-            await this.waitForLoader();
-            await delay(10000);  // 10 seconds wait for Angular to render slots
+            console.log('\n   ⏳ Waiting for loader to disappear...');
+            await this.waitForLoader();  // Wait until loader is gone
 
             // Step 7: ALL 3 DROPDOWNS SELECTED - Now detect earliest available slot
             console.log('\n   ✅ All 3 dropdowns filled successfully!');
@@ -327,6 +328,9 @@ export class VFSBookingFlow {
             console.log(`      - Centre: ${this.config.applicationCentre}`);
             console.log(`      - Category: E-Visa Tourist Single Entry`);
             console.log(`      - Sub-category: ${SUB_CATEGORY_MAP[this.config.subCategory] || this.config.subCategory}`);
+            console.log('\n   ⏳ Waiting 5 seconds for slot info to render...');
+            await new Promise(r => setTimeout(r, 5000));  // STRICT 5 second wait (not affected by timing mode)
+            console.log('   ✅ 5-second wait complete!');
 
             // Detect slot info
             console.log('\n🔍 Looking for earliest available slots...');
@@ -336,13 +340,100 @@ export class VFSBookingFlow {
             if (slotInfo) {
                 console.log(`\n🎯 SLOTS FOUND:\n${slotInfo}`);
 
-                // EARLIEST_SLOT MODE: Return immediately with slot info
-                // DO NOT click Continue or go to Your Details page
-                console.log('\n✅ Returning with slot info (EARLIEST_SLOT mode - no form filling)');
+                // Check mode - return early for EARLIEST_SLOT, continue for FULL_SCENARIO
+                if (this.config.mode !== 'full_scenario') {
+                    // EARLIEST_SLOT MODE: Return immediately with slot info
+                    console.log('\n✅ Returning with slot info (EARLIEST_SLOT mode - no form filling)');
+                    return {
+                        success: true,
+                        state: 'slot_found',
+                        message: 'Slots found!',
+                        earliestSlot: slotInfo,
+                    };
+                }
+
+                // FULL_SCENARIO MODE: Continue with full booking process
+                console.log('\n📋 FULL SCENARIO MODE - Continuing with booking...');
+
+                // Step 8: Click Continue button
+                console.log('\n➡️ Clicking Continue button...');
+                const continueClicked = await this.clickContinueButton();
+
+                if (!continueClicked) {
+                    await this.takeScreenshot('continue-button-failed');
+                    return {
+                        success: true,
+                        state: 'slot_found',
+                        message: `Slot found: ${slotInfo}, but could not click Continue`,
+                        earliestSlot: slotInfo,
+                    };
+                }
+                await this.takeScreenshot('continue-clicked');
+
+                // Step 9: Wait for Your Details page
+                console.log('\n📝 Waiting for Your Details page...');
+                const detailsPageLoaded = await this.waitForYourDetailsPage();
+
+                if (detailsPageLoaded) {
+                    await this.takeScreenshot('your-details-page');
+
+                    // Step 10: Fill the Your Details form
+                    const formFilled = await this.fillYourDetailsForm();
+                    await this.takeScreenshot('form-filled');
+
+                    if (formFilled) {
+                        // Step 11: Click Save button
+                        const saved = await this.clickSaveButton();
+                        await this.takeScreenshot('save-clicked');
+
+                        if (saved) {
+                            // Step 12: Wait for Summary page and click Continue
+                            const continuedFromSummary = await this.waitForSummaryAndContinue();
+                            await this.takeScreenshot('summary-page');
+
+                            if (continuedFromSummary) {
+                                // Step 13: Wait for Book Appointment page
+                                const bookAppointmentLoaded = await this.waitForBookAppointmentPage();
+                                await this.takeScreenshot('book-appointment-page');
+
+                                return {
+                                    success: true,
+                                    state: bookAppointmentLoaded ? 'book_appointment' : 'summary_page',
+                                    message: bookAppointmentLoaded
+                                        ? `Ready to book appointment! Slot: ${slotInfo}`
+                                        : `Summary complete, waiting for Book Appointment page. Slot: ${slotInfo}`,
+                                    earliestSlot: slotInfo,
+                                };
+                            }
+
+                            return {
+                                success: true,
+                                state: 'details_filled',
+                                message: `Form saved but could not continue from Summary. Slot: ${slotInfo}`,
+                                earliestSlot: slotInfo,
+                            };
+                        }
+
+                        return {
+                            success: true,
+                            state: 'details_page',
+                            message: `Form filled but Save failed. Slot: ${slotInfo}`,
+                            earliestSlot: slotInfo,
+                        };
+                    }
+
+                    return {
+                        success: true,
+                        state: 'details_page',
+                        message: `On Your Details page but form fill had issues. Slot: ${slotInfo}`,
+                        earliestSlot: slotInfo,
+                    };
+                }
+
                 return {
                     success: true,
                     state: 'slot_found',
-                    message: 'Slots found!',
+                    message: `Slot found: ${slotInfo}, Continue clicked`,
                     earliestSlot: slotInfo,
                 };
             }
@@ -587,20 +678,26 @@ export class VFSBookingFlow {
             try {
                 console.log(`   📍 Attempt ${attempt}/${maxRetries}...`);
 
-                // Find the first mat-select (Application Centre dropdown)
-                const dropdown = this.page.locator('mat-select').first();
+                // Strategy 1: User-Provided XPath (1st mat-form-field)
+                let dropdown = this.page.locator('xpath=/html/body/app-root/div/main/div/app-eligibility-criteria/section/form/mat-card[1]/form/div[1]/mat-form-field/div[1]/div/div[2]/mat-select').first();
+
+                if (!await dropdown.isVisible()) {
+                    // Fallback
+                    dropdown = this.page.locator('mat-select').first();
+                }
 
                 if (!await dropdown.isVisible({ timeout: 5000 })) {
                     console.log('   ❌ Application Centre dropdown not found');
                     continue;
                 }
 
-                // Click to open dropdown
-                await this.behavior.naturalClick(dropdown);
+                // Click to open dropdown (Force Click for reliability)
+                await new Promise(r => setTimeout(r, 1000));
+                await dropdown.click({ force: true });
 
                 // Wait for dropdown panel to appear
                 console.log('   ⏳ Waiting for dropdown panel...');
-                await new Promise(r => setTimeout(r, 1500 + (attempt * 500))); // Longer wait on retries
+                await new Promise(r => setTimeout(r, 1500));
 
                 // Wait for overlay with options
                 try {
@@ -632,26 +729,40 @@ export class VFSBookingFlow {
 
                 // Try multiple strategies to find the option
                 const selectionStrategies = [
-                    // Strategy 1: Exact Japan Dubai match (id=DXB)
+                    // Strategy 1: User Suggested Specific Option (Option 6)
+                    // Prioritized to avoid "Dubai Silicon Oasis" mismatch
+                    () => this.page.locator('xpath=/html/body/div[4]/div[2]/div/div/mat-option[6]'),
+
+                    // Strategy 2: Strict Text Match (Japan Visa Application Centre, Dubai)
+                    () => this.page.locator('mat-option').filter({ hasText: 'Japan Visa Application Centre, Dubai' }).first(),
+
+                    // Strategy 3: ID Fallback
                     () => this.page.locator('mat-option#DXB').first(),
-                    // Strategy 2: Contains Japan and Dubai
-                    () => this.page.locator('mat-option:has-text("Japan Visa Application Centre, Dubai")').first(),
-                    // Strategy 3: Contains Japan and Dubai partial
-                    () => this.page.locator('mat-option:has-text("Japan")').filter({ hasText: 'Dubai' }).first(),
-                    // Strategy 4: Just Dubai
-                    () => this.page.locator('mat-option:has-text("Dubai")').first(),
                 ];
 
                 for (const getOption of selectionStrategies) {
                     const option = getOption();
                     if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
                         const text = await option.textContent();
-                        await this.behavior.naturalClick(option);
-                        console.log(`   ✅ Selected: ${text?.trim()}`);
+                        await option.click({ force: true });
+                        console.log(`   ✅ Clicked option: ${text?.trim()}`);
 
-                        // Wait for selection to register
-                        await new Promise(r => setTimeout(r, 1000));
-                        return true;
+                        // Wait for selection to register - STRICT 2 seconds
+                        await new Promise(r => setTimeout(r, 2000));
+
+                        // Verify selection actually worked
+                        const dropdown = this.page.locator('mat-select').first();
+                        const selectedValue = await dropdown.textContent();
+                        if (selectedValue && !selectedValue.includes('Choose your Application')) {
+                            console.log(`   ✅ Verified selection: ${selectedValue.trim()}`);
+                            return true;
+                        } else {
+                            console.log(`   ⚠️ Selection not verified, dropdown still shows: ${selectedValue?.trim()}`);
+                            // Try clicking the option again
+                            await option.click({ force: true });
+                            await new Promise(r => setTimeout(r, 2000));
+                            return true;
+                        }
                     }
                 }
 
@@ -682,11 +793,16 @@ export class VFSBookingFlow {
         console.log('   🔍 Looking for Category dropdown...');
 
         try {
-            // Wait for page to be stable
-            await delay(1500);
+            // Wait for page to be stable - STRICT wait
+            await new Promise(r => setTimeout(r, 1500));
 
-            // Category is mat-select-2 (from user's image)
-            const dropdown = this.page.locator('mat-select#mat-select-2');
+            // Category: User XPath (div[2])
+            let dropdown = this.page.locator('xpath=/html/body/app-root/div/main/div/app-eligibility-criteria/section/form/mat-card[1]/form/div[2]/mat-form-field/div[1]/div/div[2]/mat-select').first();
+
+            if (!await dropdown.isVisible()) {
+                // Fallback
+                dropdown = this.page.locator('mat-select#mat-select-2');
+            }
 
             if (!await dropdown.isVisible({ timeout: 5000 })) {
                 console.log('   ❌ Category dropdown mat-select-2 not visible');
@@ -698,8 +814,8 @@ export class VFSBookingFlow {
                 await dropdown.click({ force: true });
                 console.log(`   ✅ Clicked category dropdown (attempt ${clickAttempt})`);
 
-                // Wait for options panel to appear
-                await delay(1500);
+                // Wait for options panel to appear - STRICT wait
+                await new Promise(r => setTimeout(r, 1500));
 
                 // Wait for mat-option to be visible
                 try {
@@ -711,7 +827,7 @@ export class VFSBookingFlow {
                         console.log('   ⚠️ Options panel not visible, clicking again...');
                         // Press Escape to close partial overlay
                         await this.page.keyboard.press('Escape');
-                        await delay(500);
+                        await new Promise(r => setTimeout(r, 1000));
                     } else {
                         console.log('   ⚠️ Options panel not visible after 3 clicks');
                         return false;
@@ -733,7 +849,7 @@ export class VFSBookingFlow {
                     const text = await option.textContent();
                     await option.click({ force: true });
                     console.log(`   ✅ Selected category: ${text?.trim()}`);
-                    await delay(1000);
+                    await new Promise(r => setTimeout(r, 1000));
                     return true;
                 }
             }
@@ -758,11 +874,16 @@ export class VFSBookingFlow {
         console.log('   � Looking for Sub-category dropdown...');
 
         try {
-            // Wait for page to be stable after category selection
-            await delay(1500);
+            // Wait for page to be stable after category selection - STRICT wait
+            await new Promise(r => setTimeout(r, 1500));
 
-            // Sub-category is the 3rd dropdown (mat-select at index 2, or use nth)
-            const dropdown = this.page.locator('mat-select').nth(2);
+            // Sub-category: User XPath (div[3])
+            let dropdown = this.page.locator('xpath=/html/body/app-root/div/main/div/app-eligibility-criteria/section/form/mat-card[1]/form/div[3]/mat-form-field/div[1]/div/div[2]/mat-select').first();
+
+            if (!await dropdown.isVisible()) {
+                // Fallback
+                dropdown = this.page.locator('mat-select').nth(2);
+            }
 
             if (!await dropdown.isVisible({ timeout: 3000 })) {
                 console.log('   ❌ Sub-category dropdown not visible');
@@ -773,8 +894,8 @@ export class VFSBookingFlow {
             await dropdown.click({ force: true });
             console.log('   ✅ Clicked sub-category dropdown');
 
-            // Wait for options panel to appear
-            await delay(2000);
+            // Wait for options panel to appear - STRICT wait
+            await new Promise(r => setTimeout(r, 1500));
 
             // Wait for mat-option to be visible
             try {
@@ -783,7 +904,7 @@ export class VFSBookingFlow {
             } catch {
                 console.log('   ⚠️ Options panel not visible, retrying click...');
                 await dropdown.click({ force: true });
-                await delay(2000);
+                await new Promise(r => setTimeout(r, 1500));
             }
 
             // Get the display text for the sub-category
@@ -878,7 +999,7 @@ export class VFSBookingFlow {
 
         try {
             // Wait for slot info to render (reduced from 3s to 1s)
-            await delay(1000);
+            await delay(500);
 
             // Get all slot texts from page
             const pageContent = await this.page.textContent('body');
@@ -921,15 +1042,16 @@ export class VFSBookingFlow {
      */
     private async clickContinueButton(): Promise<boolean> {
         try {
-            // Wait a bit for the button to be ready
+            console.log('   🖱️ Preparing to click Continue...');
             await new Promise(r => setTimeout(r, 2000));
 
             const buttonSelectors = [
-                // From user's DOM inspection
+                // Strategy 1: User-Provided XPath
+                'xpath=/html/body/app-root/div/main/div/app-eligibility-criteria/section/form/mat-card[2]/button',
+                // Fallbacks
                 'mat-card button.btn-brand-orange',
                 'button:has(span.mdc-button__label:has-text("Continue"))',
                 'button.btn-brand-orange:has-text("Continue")',
-                // Generic Continue button
                 'button:has-text("Continue")',
                 'button.mdc-button--raised:has-text("Continue")',
             ];
@@ -940,12 +1062,9 @@ export class VFSBookingFlow {
                 try {
                     const candidate = this.page.locator(selector).first();
                     if (await candidate.isVisible({ timeout: 3000 })) {
-                        const text = await candidate.textContent().catch(() => '');
-                        if (text?.toLowerCase().includes('continue')) {
-                            button = candidate;
-                            console.log(`   ✅ Found Continue button with: ${selector}`);
-                            break;
-                        }
+                        button = candidate;
+                        console.log(`   ✅ Found Continue button with: ${selector}`);
+                        break;
                     }
                 } catch {
                     continue;
@@ -957,9 +1076,14 @@ export class VFSBookingFlow {
                 return false;
             }
 
-            // Natural click with human behavior
-            await this.behavior.naturalClick(button);
-            console.log('   ✅ Clicked Continue');
+            // User requested 2 clicks due to flakiness
+            for (let i = 1; i <= 2; i++) {
+                if (await button.isVisible()) {
+                    console.log(`   🖱️ Clicking Continue (${i}/2)...`);
+                    await button.click({ force: true });
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+            }
 
             // Wait for navigation
             await new Promise(r => setTimeout(r, 3000));
@@ -1068,6 +1192,18 @@ export class VFSBookingFlow {
             }
 
             // ═══════════════════════════════════════════════════════════
+            // GENDER
+            // ═══════════════════════════════════════════════════════════
+            console.log('   📝 Selecting Gender...');
+            await this.selectGender(applicant.gender);
+
+            // ═══════════════════════════════════════════════════════════
+            // DATE OF BIRTH
+            // ═══════════════════════════════════════════════════════════
+            console.log('   📝 Entering Date of Birth...');
+            await this.enterDateOfBirth(applicant.dateOfBirth);
+
+            // ═══════════════════════════════════════════════════════════
             // NATIONALITY (Dropdown)
             // ═══════════════════════════════════════════════════════════
             console.log('   📝 Selecting Nationality...');
@@ -1077,12 +1213,13 @@ export class VFSBookingFlow {
             // PASSPORT NUMBER
             // ═══════════════════════════════════════════════════════════
             console.log('   📝 Filling Passport Number...');
-            const passportInput = this.page.locator('input[placeholder*="passport" i], input[formcontrolname*="passport" i]').first();
-            if (await passportInput.isVisible({ timeout: 3000 })) {
-                await this.behavior.robustFill(passportInput, applicant.passportNumber, 'Passport Number');
-            } else {
-                console.log('   ⚠️ Passport Number field not found');
-            }
+            await this.enterPassportNumber(applicant.passportNumber);
+
+            // ═══════════════════════════════════════════════════════════
+            // PASSPORT EXPIRY
+            // ═══════════════════════════════════════════════════════════
+            console.log('   📝 Filling Passport Expiry...');
+            await this.enterPassportExpiry(applicant.passportExpiry);
 
             // ═══════════════════════════════════════════════════════════
             // CONTACT NUMBER (Country Code + Number)
@@ -1214,6 +1351,216 @@ export class VFSBookingFlow {
     }
 
     /**
+     * Select Gender dropdown
+     */
+    private async selectGender(gender: string): Promise<boolean> {
+        console.log(`   📝 Selecting Gender: ${gender}...`);
+
+        try {
+            // Strategy 1: User-Provided XPath (app-dynamic-control[9])
+            // Using relative xpath for robustness: //app-dynamic-control[9]//mat-select
+            let dropdown = this.page.locator('xpath=//app-dynamic-control[9]//mat-select').first();
+
+            if (!await dropdown.isVisible()) {
+                // Strategy 2: Label "Gender"
+                dropdown = this.page.locator('mat-form-field').filter({ hasText: 'Gender' }).locator('mat-select').first();
+            }
+
+            if (!await dropdown.isVisible()) {
+                // Strategy 3: Form control name
+                dropdown = this.page.locator('mat-select[formcontrolname*="gender" i]').first();
+            }
+
+            if (!await dropdown.isVisible()) {
+                // Strategy 4: First visible mat-select (Legacy)
+                dropdown = this.page.locator('mat-select').first();
+            }
+
+            if (await dropdown.isVisible()) {
+                await dropdown.click();
+                await new Promise(r => setTimeout(r, 1000)); // Strict wait for panel
+
+                // Select option (Strict match to avoid Male matching Female)
+                const option = this.page.locator('mat-option').filter({ hasText: new RegExp(`^\\s*${gender}\\s*$`, 'i') }).first();
+                if (await option.isVisible()) {
+                    await option.click({ force: true });
+                    await new Promise(r => setTimeout(r, 500));
+                    console.log(`   ✅ Selected Gender: ${gender}`);
+                    return true;
+                }
+
+                // Fallback option
+                const optionCI = this.page.locator('mat-option').filter({ hasText: new RegExp(gender, 'i') }).first();
+                if (await optionCI.isVisible()) {
+                    await optionCI.click();
+                    console.log(`   ✅ Selected Gender (CI): ${gender}`);
+                    return true;
+                }
+
+                // Close if failed
+                await this.page.keyboard.press('Escape');
+            }
+
+            console.log('   ❌ Gender dropdown/option not found');
+            return false;
+
+        } catch (error) {
+            console.log('   ❌ Error selecting gender:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Enter Date of Birth
+     * Format: DD/MM/YYYY
+     */
+    private async enterDateOfBirth(dob: string): Promise<boolean> {
+        console.log(`   📝 Entering DOB: ${dob}...`);
+        try {
+            // Identify input (Updated with user screenshots)
+            // 1. Exact ID
+            let input = this.page.locator('#dateOfBirth').first();
+
+            if (!await input.isVisible()) {
+                input = this.page.locator('input[placeholder="Please select the date"]').first();
+            }
+
+            if (!await input.isVisible()) {
+                input = this.page.locator('input[ngbdatepicker]').first();
+            }
+
+            if (!await input.isVisible()) {
+                // Form control name fallback
+                input = this.page.locator('input[formcontrolname*="dateOfBirth" i]').first();
+            }
+
+            if (!await input.isVisible()) {
+                // 2. By placeholder
+                input = this.page.locator('input[placeholder="DD/MM/YYYY"]').first();
+            }
+
+            if (!await input.isVisible()) {
+                // 3. Angular Material Datepicker input
+                input = this.page.locator('input[matdatepicker]').first();
+            }
+
+            if (!await input.isVisible()) {
+                // 4. By Label "Date Of Birth"
+                const label = this.page.locator('label:has-text("Date Of Birth"), mat-label:has-text("Date Of Birth")').first();
+                if (await label.isVisible()) {
+                    // Try to find input inside the same mat-form-field or parent
+                    input = label.locator('xpath=./ancestor::mat-form-field//input').first();
+                }
+            }
+
+            if (!await input.isVisible()) {
+                // 5. Try looking for calendar icon parent
+                input = this.page.locator('mat-datepicker-toggle').first().locator('xpath=../preceding-sibling::input').first();
+            }
+
+            if (await input.isVisible()) {
+                await input.click();
+                // Robust clear
+                await input.press('Control+A');
+                await input.press('Backspace');
+                await new Promise(r => setTimeout(r, 200));
+
+                // Type date (digits only to avoid double-slashes)
+                const cleanDate = dob.replace(/[^0-9]/g, '');
+                await this.page.keyboard.type(cleanDate, { delay: 100 });
+                console.log('   ✅ Entered DOB');
+                return true;
+            } else {
+                console.log('   ⚠️ DOB input not found. Trying Generic input approach...');
+                // 6. Just find the 3rd VISIBLE input (First Name, Last Name, DOB...)
+                const inputs = await this.page.locator('input').all();
+                let visibleInputs = [];
+                for (const inp of inputs) {
+                    if (await inp.isVisible()) visibleInputs.push(inp);
+                }
+
+                if (visibleInputs.length >= 3) {
+                    console.log(`   Using 3rd visible input (of ${visibleInputs.length}) as fallback for DOB...`);
+                    const fallbackInput = visibleInputs[2];
+                    await fallbackInput.click();
+                    await fallbackInput.clear();
+                    await this.page.keyboard.type(dob, { delay: 100 });
+                    console.log('   ✅ Entered DOB (Fallback)');
+                    return true;
+                }
+
+                return false;
+            }
+        } catch (error) {
+            console.log('   ❌ Error entering DOB:', error);
+            return false;
+        }
+    }
+
+    private async enterPassportNumber(number: string): Promise<boolean> {
+        console.log(`   📝 Entering Passport Number: ${number}...`);
+        const selectors = [
+            'xpath=//app-dynamic-control[11]//input',
+            'input[formcontrolname*="passportNumber" i]',
+            'input[name*="passport" i]',
+            'input[placeholder*="Passport Number" i]',
+            'input[placeholder*="passport" i]'
+        ];
+
+        for (const selector of selectors) {
+            const input = this.page.locator(selector).first();
+            if (await input.isVisible()) {
+                await input.scrollIntoViewIfNeeded();
+                await input.click();
+                await input.clear();
+                await this.page.keyboard.type(number, { delay: 100 });
+                console.log('   ✅ Entered Passport Number');
+                return true;
+            }
+        }
+        console.log('   ⚠️ Passport Number input not found');
+        return false;
+    }
+
+    private async enterPassportExpiry(date: string): Promise<boolean> {
+        console.log(`   📝 Entering Passport Expiry: ${date}...`);
+
+        // Strategy 1: User-Provided XPath (app-dynamic-control[12])
+        let input = this.page.locator('xpath=//app-dynamic-control[12]//input').first();
+
+        if (!await input.isVisible()) {
+            // Strategy 2: Exact ID fallback
+            input = this.page.locator('#passportExpiryDate').first();
+        }
+
+        if (!await input.isVisible()) {
+            input = this.page.locator('input[formcontrolname*="passportExpir" i]').first();
+        }
+
+        if (!await input.isVisible()) {
+            input = this.page.locator('input[placeholder*="Expiry" i]').first();
+        }
+
+        if (await input.isVisible()) {
+            await input.scrollIntoViewIfNeeded();
+            await input.click();
+            // Robust clear
+            await input.press('Control+A');
+            await input.press('Backspace');
+            await new Promise(r => setTimeout(r, 200));
+
+            // Type date (digits only)
+            const cleanDate = date.replace(/[^0-9]/g, '');
+            await this.page.keyboard.type(cleanDate, { delay: 100 });
+            await this.page.keyboard.press('Tab');
+            console.log('   ✅ Entered Passport Expiry');
+            return true;
+        }
+        console.log('   ⚠️ Passport Expiry input not found');
+        return false;
+    }
+
+    /**
      * Select nationality from dropdown
      * DOM: mat-select-3-panel with options having span.mdc-list-item__primary-text
      * Options have IDs like mat-option-7 (AFGHANISTAN), mat-option-8 (ALBANIA), etc.
@@ -1228,134 +1575,74 @@ export class VFSBookingFlow {
             try {
                 console.log(`   📍 Nationality attempt ${attempt}/${maxRetries}...`);
 
-                // First check if already selected
-                const currentValue = await this.page.locator('mat-form-field:has-text("Nationality") .mat-mdc-select-value-text, mat-select#mat-select-3 .mat-mdc-select-value-text').first().textContent().catch(() => '');
-                if (currentValue?.toUpperCase().includes(nationalityUpper)) {
-                    console.log(`   ✅ Nationality already selected: ${currentValue}`);
-                    return true;
+                // Strategy 1: User-Provided XPath (app-dynamic-control[10])
+                let dropdown = this.page.locator('xpath=//app-dynamic-control[10]//mat-select').first();
+
+                if (!await dropdown.isVisible()) {
+                    // Strategy 2: Label "Current Nationality"
+                    dropdown = this.page.locator('mat-form-field').filter({ hasText: 'Current Nationality' }).locator('mat-select').first();
                 }
 
-                // Find and click the nationality dropdown
-                const dropdownSelectors = [
-                    'mat-form-field:has-text("Nationality") mat-select',
-                    'mat-form-field:has-text("Current Nationality") mat-select',
-                    'mat-select#mat-select-3',
-                    'app-input-control:has-text("Nationality") mat-select',
-                    // More generic - find the 3rd or 4th mat-select on the page
-                    'mat-select:nth-of-type(3)',
-                ];
-
-                let dropdownClicked = false;
-                let dropdown: Locator | null = null;
-
-                for (const selector of dropdownSelectors) {
-                    try {
-                        const d = this.page.locator(selector).first();
-                        if (await d.isVisible({ timeout: 1500 })) {
-                            dropdown = d;
-                            // Click multiple times to ensure it opens
-                            await this.behavior.naturalClick(d);
-                            await new Promise(r => setTimeout(r, 800));
-                            await d.click(); // Direct click as backup
-                            dropdownClicked = true;
-                            console.log(`   ✅ Clicked dropdown: ${selector}`);
-                            break;
-                        }
-                    } catch {
-                        continue;
-                    }
+                if (!await dropdown.isVisible()) {
+                    // Try just "Nationality" if "Current Nationality" fails
+                    dropdown = this.page.locator('mat-form-field').filter({ hasText: 'Nationality' }).locator('mat-select').first();
                 }
 
-                if (!dropdownClicked) {
-                    console.log('   ⚠️ Could not find nationality dropdown');
-                    await new Promise(r => setTimeout(r, 1000));
-                    continue;
+                if (!await dropdown.isVisible()) {
+                    // Fallback: form control name
+                    dropdown = this.page.locator('mat-select[formcontrolname*="nationality" i]').first();
                 }
 
-                // Wait for panel to open
-                await new Promise(r => setTimeout(r, 2000));
-
-                // Check if panel is visible
-                const panelVisible = await this.page.locator('#mat-select-3-panel mat-option, .cdk-overlay-container mat-option').first().isVisible({ timeout: 3000 }).catch(() => false);
-
-                if (!panelVisible) {
-                    console.log('   ⚠️ Panel not visible, clicking dropdown again...');
-                    if (dropdown) {
-                        await dropdown.click({ force: true });
-                        await new Promise(r => setTimeout(r, 2000));
-                    }
-                }
-
-                // Now try to find and click the option
-                // Strategy 1: Direct text match
-                console.log(`   🔍 Looking for option: "${nationalityUpper}"...`);
-
-                const exactOption = this.page.locator(`mat-option:has(span:text-is("${nationalityUpper}"))`).first();
-                if (await exactOption.isVisible({ timeout: 1500 }).catch(() => false)) {
-                    await exactOption.click();
-                    console.log(`   ✅ Clicked exact match option`);
-                    await new Promise(r => setTimeout(r, 1000));
-
-                    // Verify selection
-                    if (await this.verifyNationalitySelected(nationalityUpper)) {
-                        return true;
-                    }
-                }
-
-                // Strategy 2: Contains text match
-                const containsOption = this.page.locator(`mat-option:has-text("${nationalityUpper}")`).first();
-                if (await containsOption.isVisible({ timeout: 1500 }).catch(() => false)) {
-                    await containsOption.click();
-                    console.log(`   ✅ Clicked contains match option`);
-                    await new Promise(r => setTimeout(r, 1000));
-
-                    if (await this.verifyNationalitySelected(nationalityUpper)) {
-                        return true;
-                    }
-                }
-
-                // Strategy 3: Iterate through all visible options
-                const allOptions = await this.page.locator('.cdk-overlay-container mat-option, #mat-select-3-panel mat-option').all();
-                console.log(`   📋 Found ${allOptions.length} options in panel`);
-
-                for (const opt of allOptions) {
-                    try {
-                        const optText = await opt.textContent();
-                        const cleanText = optText?.trim().toUpperCase() || '';
-
-                        if (cleanText === nationalityUpper || cleanText.includes(nationalityUpper)) {
-                            console.log(`   🎯 Found matching option: "${cleanText}"`);
-
-                            // Scroll into view first
-                            await opt.scrollIntoViewIfNeeded();
-                            await new Promise(r => setTimeout(r, 200));
-
-                            // Click it
-                            await opt.click();
-                            console.log(`   ✅ Clicked option`);
-                            await new Promise(r => setTimeout(r, 1000));
-
-                            if (await this.verifyNationalitySelected(nationalityUpper)) {
-                                return true;
+                if (!await dropdown.isVisible()) {
+                    // Fallback: Use the 2nd visible mat-select on the page
+                    console.log('   ⚠️ Generic fallback: Looking for 2nd visible mat-select...');
+                    const selects = await this.page.locator('mat-select').all();
+                    let visibleCount = 0;
+                    for (const s of selects) {
+                        if (await s.isVisible()) {
+                            if (visibleCount === 1) { // Index 1 = 2nd item
+                                dropdown = s;
+                                break;
                             }
+                            visibleCount++;
                         }
-                    } catch (e) {
-                        continue;
                     }
                 }
 
-                // Close dropdown before retry
-                await this.page.keyboard.press('Escape');
-                await new Promise(r => setTimeout(r, 500));
+                if (await dropdown.isVisible()) {
+                    await dropdown.scrollIntoViewIfNeeded();
 
-            } catch (error) {
-                console.log(`   ⚠️ Attempt ${attempt} failed:`, error);
+                    // Click carefully
+                    await dropdown.click();
+
+                    // Wait for panel (either .mat-mdc-select-panel or .cdk-overlay-pane)
+                    await this.page.waitForSelector('.mat-mdc-select-panel, .cdk-overlay-pane', { state: 'visible', timeout: 5000 });
+                    await new Promise(r => setTimeout(r, 500)); // Animation wait
+
+                    // Click option
+                    // Selector based on screenshots: mat-option matching text
+                    const option = this.page.locator('mat-option').filter({ hasText: nationalityUpper }).first();
+
+                    if (await option.isVisible()) {
+                        await option.scrollIntoViewIfNeeded();
+                        await option.click();
+                        console.log(`   ✅ Selected Nationality: ${nationality}`);
+                        return true;
+                    } else {
+                        console.log(`   ⚠️ Option '${nationalityUpper}' not found visible in panel.`);
+                    }
+
+                    // Close if failed
+                    await this.page.keyboard.press('Escape');
+                } else {
+                    console.log('   ⚠️ Dropdown not found');
+                }
+
+                await new Promise(r => setTimeout(r, 1000));
+            } catch (e: any) {
+                console.log(`   ⚠️ Failed attempt ${attempt}: ${e.message}`);
+                // Ensure dropdown is closed
                 await this.page.keyboard.press('Escape').catch(() => { });
-            }
-
-            if (attempt < maxRetries) {
-                console.log('   🔄 Retrying nationality selection...');
-                await new Promise(r => setTimeout(r, 1500));
             }
         }
 
@@ -1411,7 +1698,9 @@ export class VFSBookingFlow {
             }
 
             const buttonSelectors = [
-                // From user's DOM inspection - exact match
+                // Strategy 1: User-Provided XPath
+                'xpath=/html/body/app-root/div/main/div/app-applicant-details/section/mat-card[2]/app-dynamic-form/div/div/app-dynamic-control/div/div/div[2]/button',
+                // Fallbacks
                 'button.btn-brand-orange.btn-block:has(span.mdc-button__label:has-text("Save"))',
                 'button.mdc-button--outlined.btn-brand-orange:has-text("Save")',
                 'button.btn-brand-orange:has(span.mdc-button__label:has-text("Save"))',
