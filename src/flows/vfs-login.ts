@@ -234,12 +234,8 @@ export class VFSLoginFlow {
             const baseUrl = new URL(this.config.loginUrl).origin;
             await this.page.goto(baseUrl + '/are/en/jpn/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-            console.log('   Humanizing: Quick scroll and look...');
-            await this.behavior.idleBehavior(400); // Faster mouse drift
-            await this.behavior.naturalScroll('down', 'medium');
-            await new Promise(r => setTimeout(r, 200));
-            await this.behavior.naturalScroll('up', 'small');
-            await new Promise(r => setTimeout(r, 150));
+            console.log('   (Skipped warm-up for speed)');
+            await new Promise(r => setTimeout(r, 100));
 
             console.log('   ✅ Warm-up complete');
         } catch (e) {
@@ -282,7 +278,7 @@ export class VFSLoginFlow {
         console.log('🍪 Checking for cookie consent...');
 
         // Brief pause to "notice" the banner
-        await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+        await new Promise(r => setTimeout(r, 100));
 
         const handled = await this.uiHandler.handleVFSCookieConsent();
 
@@ -306,13 +302,7 @@ export class VFSLoginFlow {
             const isWebdriver = await this.page.evaluate(() => navigator.webdriver);
             console.log(`   🕵️ Stealth Check: navigator.webdriver = ${isWebdriver} (Should be false)`);
 
-            // Wait for any input to be visible (ensure page is loaded)
-            try {
-                console.log('   ⏳ Waiting for login form to appear...');
-                await this.page.waitForSelector('input[type="email"], input[type="text"]', { state: 'visible', timeout: 8000 });
-            } catch {
-                console.log('   ⚠️ Login form wait timed out - proceeding to search anyway');
-            }
+            // Form is ready after loader disappears - no additional wait needed
 
             // Find email input
             const emailInput = await this.findLoginField('email');
@@ -324,15 +314,9 @@ export class VFSLoginFlow {
                 };
             }
 
-            // Move mouse around naturally before filling form
-            await this.behavior.idleBehavior(500);
-
-            // Fill email with robust interaction (3 clicks)
+            // Fill email INSTANTLY (Native fill)
             console.log('   📧 Entering email...');
-            await this.behavior.robustFill(emailInput, credentials.email, 'Email');
-
-            // Pause between fields (like a real user)
-            await new Promise(r => setTimeout(r, this.timing.getActionDelay('focus')));
+            await emailInput.fill(credentials.email);
 
             // Find password input
             const passwordInput = await this.findLoginField('password');
@@ -344,13 +328,12 @@ export class VFSLoginFlow {
                 };
             }
 
-            // Fill password with robust interaction (3 clicks)
+            // Fill password INSTANTLY (Native fill)
             console.log('   🔑 Entering password...');
-            await this.behavior.robustFill(passwordInput, credentials.password, 'Password');
+            await passwordInput.fill(credentials.password);
 
-            // Pre-submit review pause (humans double-check)
-            console.log('\n   👀 Reviewing form...');
-            await new Promise(r => setTimeout(r, this.timing.getThinkingPause('complex')));
+            // Pre-submit review (Skipped for speed)
+            await new Promise(r => setTimeout(r, 100));
 
             // Handle Cloudflare Turnstile checkbox
             console.log('   Looking for Cloudflare Turnstile...');
@@ -359,9 +342,9 @@ export class VFSLoginFlow {
             if (turnstileHandled) {
                 console.log('   Turnstile clicked, waiting for verification...');
 
-                // Wait up to 2 seconds for verification (fast mode)
+                // Wait up to 15 seconds for verification
                 let verified = false;
-                for (let i = 0; i < 2; i++) {
+                for (let i = 0; i < 15; i++) {
                     await new Promise(r => setTimeout(r, 1000));
                     process.stdout.write('.');
 
@@ -402,12 +385,24 @@ export class VFSLoginFlow {
 
             console.log('   🎉 Congrats! Script ran successfully. Button clicked.');
 
-            // Wait for response (reduced from 30s)
-            console.log('⏳ Waiting for response...');
-            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => { });
+            // Smart polling for dashboard
+            console.log('⏳ Waiting for dashboard to appear...');
 
-            // Brief wait for page transition (reduced from 2s)
-            await new Promise(r => setTimeout(r, 800));
+            let onDashboard = false;
+            for (let i = 0; i < 30; i++) {
+                const url = this.page.url();
+                if (url.includes('dashboard') ||
+                    url.includes('application-center') ||
+                    await this.page.locator('button:has-text("Start New Booking")').isVisible().catch(() => false)) {
+                    console.log('   ✅ Dashboard detected!');
+                    onDashboard = true;
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 500));
+            }
+            if (!onDashboard) console.log('   ⚠️ Dashboard wait timeout - checking anyway...');
+
+            await new Promise(r => setTimeout(r, 500));
 
 
             // Analyze result
@@ -598,9 +593,8 @@ export class VFSLoginFlow {
     private async handleCloudfareTurnstile(): Promise<boolean> {
         console.log('      🔍 Scanning for Turnstile widget...');
 
-        // WAIT: Allow time for slow Turnstile rendering (user request)
-        console.log('      ⏳ Waiting 5s for Turnstile to render fully...');
-        await new Promise(r => setTimeout(r, 5000));
+        // Quick wait for Turnstile to render
+        await new Promise(r => setTimeout(r, 1000));
 
         // First, let's see what iframes exist on the page
         const iframeInfo = await this.page.evaluate(() => {

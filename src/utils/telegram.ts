@@ -49,17 +49,44 @@ export async function sendTelegramMessage(message: string): Promise<boolean> {
 }
 
 /**
- * Send slot found alert
+ * Send slot found alert with enhanced visual formatting
  */
 export async function sendSlotAlert(slotDate: string, accountEmail: string): Promise<void> {
+    // Parse the slot dates from the formatted string
+    const slots = slotDate.split('\n').filter(line => line.trim());
+
+    let slotsFormatted = '';
+    slots.forEach(slot => {
+        // Extract applicant count and date
+        const match = slot.match(/(\d+)[.,]\s*(\d+)[,\s]+Applicants is:\s*(\d{2}-\d{2}-\d{4})/i);
+        if (match) {
+            const applicants = match[2];
+            const date = match[3];
+            slotsFormatted += `\n   🗓️  <b>${applicants} Applicant${applicants !== '1' ? 's' : ''}</b> → ${date}`;
+        } else {
+            slotsFormatted += `\n   📅  ${slot}`;
+        }
+    });
+
     const message = `
-🎯 <b>VFS SLOT FOUND!</b>
+🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
+⚡ <b>VFS SLOTS AVAILABLE!</b> ⚡
+🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
 
-📅 <b>Date:</b> ${slotDate}
-📧 <b>Account:</b> ${accountEmail}
-⏰ <b>Time:</b> ${new Date().toLocaleString()}
+✨ <b>AVAILABLE DATES:</b>${slotsFormatted}
 
-🔥 Quick! Login and book now!
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 <b>Account:</b> <code>${accountEmail}</code>
+⏰ <b>Detected:</b> ${new Date().toLocaleString()}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔥 <b>ACTION REQUIRED!</b>
+👉 Login NOW and complete booking
+⚡ Slots fill up FAST!
+
+🔗 <a href="https://visa.vfsglobal.com/are/en/jpn/login">Click to Login</a>
     `.trim();
 
     await sendTelegramMessage(message);
