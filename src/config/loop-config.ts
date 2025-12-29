@@ -56,6 +56,11 @@ export interface LoopConfig {
      * Take screenshots during slot check
      */
     screenshots: boolean;
+
+    /**
+     * Rotate AWS IP after each account cycle
+     */
+    rotateIP?: boolean;
 }
 
 /**
@@ -93,6 +98,9 @@ export const loopConfig: LoopConfig = {
     // Browser settings
     headless: false,  // false = show browser window
     screenshots: true,
+
+    // AWS IP Rotation (Enable ONLY on AWS EC2 with IAM Role)
+    rotateIP: false,
 };
 
 /**
