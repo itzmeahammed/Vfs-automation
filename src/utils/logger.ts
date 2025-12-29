@@ -31,7 +31,7 @@ class Logger {
 
     constructor(config: Partial<LoggerConfig> = {}) {
         this.config = {
-            level: (process.env.LOG_LEVEL as LogLevel) || 'info',
+            level: 'info',
             showTimestamp: true,
             ...config,
         };

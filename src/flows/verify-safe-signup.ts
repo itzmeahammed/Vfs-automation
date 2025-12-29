@@ -1,12 +1,13 @@
 
 import { BrowserIdentityManager } from '../core/browser-identity.js';
 import { EnvironmentMonitor } from '../core/environment-monitor.js';
+import { loopConfig } from '../config/loop-config.js';
 
 async function main() {
     console.log('\n🔍 Verifying Sign-Up Page Accessibility (Stealth Check)...\n');
 
     const identity = new BrowserIdentityManager({
-        headless: false, // Headed for visual verification
+        headless: loopConfig.headless, // Use central config
         persistSession: true,
         profilesDir: './browser-profiles',
     });

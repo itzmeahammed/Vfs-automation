@@ -11,13 +11,14 @@ import { BrowserIdentityManager } from '../core/browser-identity.js';
 import { HumanTimingEngine } from '../core/human-timing.js';
 import { BehaviorSimulator } from '../core/behavior-simulator.js';
 import { EnvironmentMonitor } from '../core/environment-monitor.js';
+import { loopConfig } from '../config/loop-config.js';
 
 describe('Integration Tests', () => {
     let browser: Browser;
     let page: Page;
 
     beforeAll(async () => {
-        browser = await chromium.launch({ headless: true });
+        browser = await chromium.launch({ headless: loopConfig.headless });
         const context = await browser.newContext();
         page = await context.newPage();
     });
@@ -58,7 +59,7 @@ describe('Integration Tests', () => {
         it('should create and load profile', async () => {
             const identity = new BrowserIdentityManager({
                 profileId: 'test-profile',
-                headless: true,
+                headless: loopConfig.headless,
                 persistSession: true,
                 profilesDir: './test-profiles',
             });
