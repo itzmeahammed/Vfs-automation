@@ -14,6 +14,7 @@ import { BrowserIdentityManager } from './core/browser-identity.js';
 import { VFSLoginFlow } from './flows/vfs-login.js';
 import { VFSBookingFlow } from './flows/vfs-booking.js';
 import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegram.js';
+import { rotateAWSPublicIP } from './utils/aws-ip-rotator.js';
 
 // VFS URLs
 const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/mlt/dashboard';
@@ -157,6 +158,13 @@ class LoopRunner {
         // Logout
         console.log('\n🚪 Logging out...');
         await this.logout();
+
+        // Rotate IP if enabled
+        if (loopConfig.rotateIP) {
+            await rotateAWSPublicIP();
+            // Wait for network to stabilize
+            await this.sleep(5000);
+        }
     }
 
     /**

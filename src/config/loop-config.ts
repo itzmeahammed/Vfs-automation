@@ -52,6 +52,11 @@ export interface LoopConfig {
     };
 
     /**
+     * Rotate AWS IP after each account cycle
+     */
+    rotateIP?: boolean;
+
+    /**
      * VFS booking sub-category
      */
     subCategory: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family';
@@ -109,6 +114,9 @@ export const loopConfig: LoopConfig = {
     // Browser settings
     headless: false,  // false = show browser window
     screenshots: true,
+
+    // AWS IP Rotation (Enable ONLY on AWS EC2 with IAM Role)
+    rotateIP: false,
 };
 
 /**
