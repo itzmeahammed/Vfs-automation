@@ -1297,9 +1297,9 @@ export class VFSBookingFlow {
                 }
 
                 if (clicked) {
-                    // Fast verify
-                    // await delay(200); // Removed for speed
-                    if (await this.verifyNationalitySelected(nationalityUpper)) return true;
+                    // Instant verification (no delays)
+                    const verified = await this.verifyNationalitySelected(nationalityUpper);
+                    if (verified) return true;
                 } else {
                     // Fallback: iterate (fast)
                     // ... skipped for speed unless needed
@@ -1336,7 +1336,7 @@ export class VFSBookingFlow {
 
             for (const selector of valueSelectors) {
                 try {
-                    const valueText = await this.page.locator(selector).first().textContent();
+                    const valueText = await this.page.locator(selector).first().textContent({ timeout: 100 });
                     if (valueText?.toUpperCase().includes(expectedNationality.toUpperCase())) {
                         console.log(`   ✅ VERIFIED: Nationality is "${valueText?.trim()}"`);
                         return true;

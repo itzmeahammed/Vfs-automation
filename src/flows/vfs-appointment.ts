@@ -501,23 +501,36 @@ export class VFSAppointmentFlow {
             // Check for captcha
             await this.checkAndHandleCaptcha();
 
-            // Click Continue button
-            // Click Continue button with retry
-            let continueClicked = await this.clickContinueButton();
+            // Aggressive retry: Click Continue and verify URL change
+            const maxRetries = 5;
+            for (let i = 0; i < maxRetries; i++) {
+                console.log(`   🔄 Attempt ${i + 1}/${maxRetries}: Clicking Continue...`);
 
-            // Fast Check: if still on services page, retry
-            await delay(1500);
-            if (this.page.url().includes('services')) {
-                console.log('   ⚠️ Still on Services page, retrying Continue...');
-                continueClicked = await this.clickContinueButton();
+                const continueClicked = await this.clickContinueButton();
+                if (!continueClicked) {
+                    console.log('   ⚠️ Continue button not found');
+                    continue;
+                }
+
+                // Check URL 3 times to see if we've moved away from services
+                let movedAway = false;
+                for (let check = 0; check < 3; check++) {
+                    await delay(500);
+                    const currentUrl = this.page.url();
+                    if (!currentUrl.includes('services')) {
+                        console.log('   ✅ Successfully moved to Review page!');
+                        movedAway = true;
+                        break;
+                    }
+                    console.log(`   ⏳ Still on services page (check ${check + 1}/3)...`);
+                }
+
+                if (movedAway) {
+                    return true;
+                }
             }
 
-            if (continueClicked) {
-                console.log('   ✅ Passed Services page');
-                return true;
-            }
-
-            console.log('   ⚠️ Could not click Continue on Services');
+            console.log('   ⚠️ Could not navigate away from Services after multiple attempts');
             return false;
         } catch (error) {
             console.log('   ❌ Error on Services page:', error);

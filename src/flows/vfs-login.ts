@@ -304,14 +304,7 @@ export class VFSLoginFlow {
             const isWebdriver = await this.page.evaluate(() => navigator.webdriver);
             console.log(`   🕵️ Stealth Check: navigator.webdriver = ${isWebdriver} (Should be false)`);
 
-            // Wait for any input to be visible (ensure page is loaded)
-            try {
-                console.log('   ⏳ Waiting for login form to appear...');
-                await this.page.waitForSelector('input[type="email"], input[type="text"]', { state: 'visible', timeout: 20000 });
-            } catch {
-                console.log('   ⚠️ Login form wait timed out - proceeding to search anyway');
-            }
-
+            // Form is ready after loader disappears - no additional wait needed
             // Find email input
             const emailInput = await this.findLoginField('email');
             if (!emailInput) {
