@@ -75,8 +75,8 @@ export const loopConfig: LoopConfig = {
 
     // Account credentials - add 2-3 accounts
     accounts: [
-        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },
         { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },
     ],
 
     // Check slot this many times per login (default: 5)
