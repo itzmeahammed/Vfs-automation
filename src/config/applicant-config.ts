@@ -51,8 +51,8 @@ export interface VFSConfig {
 export const vfsConfig: VFSConfig = {
     applicant: {
         // Personal Information (EXACTLY as shown on passport)
-        firstName: 'JOHN',
-        lastName: 'DOE',
+        firstName: 'AHAMMED',
+        lastName: 'AHAMMED',
         gender: 'Male',
         dateOfBirth: '01/01/1990', // DD/MM/YYYY
         passportNumber: 'AB1234567',

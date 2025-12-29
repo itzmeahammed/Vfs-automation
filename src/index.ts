@@ -12,17 +12,16 @@
  * @module human-indistinguishable-automation
  */
 
-// Load environment variables from .env file FIRST
-import 'dotenv/config';
 
 import { BrowserIdentityManager } from './core/browser-identity.js';
 import { VFSLoginFlow } from './flows/vfs-login.js';
 import { VFSBookingFlow } from './flows/vfs-booking.js';
 import { VFSAppointmentFlow } from './flows/vfs-appointment.js';
 import { EnvironmentMonitor } from './core/environment-monitor.js';
+import { loopConfig, validateConfig } from './config/loop-config.js';
 
 /**
- * Configuration from environment or defaults
+ * Configuration from centralized config
  */
 interface AutomationConfig {
     email: string;
@@ -38,26 +37,23 @@ interface AutomationConfig {
 }
 
 function loadConfig(): AutomationConfig {
-    // Parse command line arguments
+    // Parse command line arguments for overrides (optional)
     const args = process.argv.slice(2);
-    const headless = args.includes('--headless');
-    const headed = args.includes('--headed');
+    // const headless = args.includes('--headless'); // Use config value primarily
 
-    // Parse proxy if set
-    const proxyServer = process.env.PROXY_SERVER;
-    const proxy = proxyServer ? {
-        server: proxyServer,
-        username: process.env.PROXY_USERNAME,
-        password: process.env.PROXY_PASSWORD,
-    } : undefined;
+    if (!validateConfig()) {
+        process.exit(1);
+    }
+
+    const primaryAccount = loopConfig.accounts[0];
 
     return {
-        email: process.env.VFS_EMAIL || '',
-        password: process.env.VFS_PASSWORD || '',
-        headless: headless || (!headed && process.env.EXECUTION_MODE === 'headless'),
-        profileId: process.env.BROWSER_PROFILE_ID || 'vfs-user-default',
-        subCategory: process.env.VFS_SUB_CATEGORY || 'tourism',
-        proxy,
+        email: primaryAccount.email,
+        password: primaryAccount.password,
+        headless: loopConfig.headless,
+        profileId: 'vfs-user-default',
+        subCategory: loopConfig.subCategory,
+        proxy: undefined, // Proxy support removed/not in loopConfig
     };
 }
 
@@ -79,11 +75,7 @@ async function main(): Promise<void> {
 
     // Validate credentials
     if (!config.email || !config.password) {
-        console.error('❌ Error: VFS_EMAIL and VFS_PASSWORD environment variables are required.');
-        console.error('\n   Create a .env file with:');
-        console.error('   VFS_EMAIL=your_email@example.com');
-        console.error('   VFS_PASSWORD=your_password');
-        console.error('\n   Or set environment variables before running.');
+        console.error('❌ Error: No accounts configured in loop-config.ts');
         process.exit(1);
     }
 
@@ -120,7 +112,7 @@ async function main(): Promise<void> {
 
         // Execute login flow
         const loginFlow = new VFSLoginFlow(page, {
-            loginUrl: process.env.VFS_LOGIN_URL || 'https://visa.vfsglobal.com/are/en/jpn/login',
+            loginUrl: 'https://visa.vfsglobal.com/are/en/jpn/login',
             screenshotOnError: true,
         });
 

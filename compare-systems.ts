@@ -5,13 +5,14 @@
  */
 
 import { chromium } from 'playwright';
+import { loopConfig } from './src/config/loop-config.js';
 
 async function collectFingerprint() {
     console.log('\n🔍 COLLECTING SYSTEM FINGERPRINT\n');
     console.log('This will save all browser details to a report file.\n');
 
     const browser = await chromium.launch({
-        headless: false,
+        headless: loopConfig.headless,
         args: [
             '--disable-blink-features=AutomationControlled',
         ],
