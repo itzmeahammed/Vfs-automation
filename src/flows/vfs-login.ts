@@ -17,10 +17,12 @@ import {
     EnvironmentMonitor,
     type StateIndicators,
 } from '../core/index.js';
+import { waitForOTP, type GmailConfig } from '../utils/gmail-otp.js';
 
 export interface LoginCredentials {
     email: string;
     password: string;
+    gmailConfig?: GmailConfig; // For OTP fetching (VFS Italy)
 }
 
 export interface LoginResult {
@@ -38,7 +40,7 @@ export interface LoginFlowConfig {
 }
 
 const DEFAULT_CONFIG: LoginFlowConfig = {
-    loginUrl: 'https://visa.vfsglobal.com/are/en/jpn/login',
+    loginUrl: 'https://visa.vfsglobal.com/are/en/ita/login',
     maxAttempts: 1, // Single attempt per session (human-like)
     screenshotOnError: true,
 };
@@ -232,7 +234,7 @@ export class VFSLoginFlow {
             // Visit a "safe" page first (e.g., homepage or google)
             // Ideally just the base domain
             const baseUrl = new URL(this.config.loginUrl).origin;
-            await this.page.goto(baseUrl + '/are/en/jpn/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await this.page.goto(baseUrl + '/are/en/ita/', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
             console.log('   (Skipped warm-up for speed)');
             await new Promise(r => setTimeout(r, 100));
@@ -404,6 +406,29 @@ export class VFSLoginFlow {
 
             await new Promise(r => setTimeout(r, 500));
 
+            // Check for OTP page (VFS Italy)
+            const otpPageDetected = await this.isOTPPage();
+            if (otpPageDetected && credentials.gmailConfig) {
+                console.log('\n📱 OTP page detected - handling OTP verification...');
+                const otpResult = await this.handleOTPPage(credentials.gmailConfig);
+                if (!otpResult) {
+                    return {
+                        success: false,
+                        state: 'failed',
+                        message: 'OTP verification failed'
+                    };
+                }
+                // After OTP, wait for dashboard again
+                console.log('⏳ Waiting for dashboard after OTP...');
+                for (let i = 0; i < 30; i++) {
+                    const url = this.page.url();
+                    if (url.includes('dashboard') || url.includes('application-center')) {
+                        console.log('   ✅ Dashboard detected after OTP!');
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
 
             // Analyze result
             return await this.analyzeLoginResult();
@@ -861,5 +886,124 @@ export class VFSLoginFlow {
             state: 'failed',
             message: 'Login result could not be determined',
         };
+    }
+
+    /**
+     * Check if the current page is the OTP verification page
+     */
+    private async isOTPPage(): Promise<boolean> {
+        try {
+            const url = this.page.url();
+            const pageContent = await this.page.textContent('body').catch(() => '');
+
+            // Check for OTP page indicators
+            if (url.includes('/login') && pageContent) {
+                const otpIndicators = [
+                    /one time password.*otp/i,
+                    /please enter your one time password/i,
+                    /sent on e-mail.*sms.*whatsapp/i,
+                ];
+
+                for (const indicator of otpIndicators) {
+                    if (indicator.test(pageContent)) {
+                        return true;
+                    }
+                }
+
+                // Check if OTP input field is visible
+                const otpInput = this.page.locator('xpath=/html/body/app-root/div/main/div/app-login/section/div/div/mat-card/form/div[2]/mat-form-field/div[1]/div/div[2]/input').first();
+                if (await otpInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Handle OTP page - fetch OTP from Gmail and submit
+     */
+    private async handleOTPPage(gmailConfig: GmailConfig): Promise<boolean> {
+        try {
+            console.log('📱 OTP page detected');
+            console.log('   📧 Fetching OTP from Gmail...');
+
+            // Wait for OTP email with retry
+            const otp = await waitForOTP(gmailConfig, 6, 10000); // 6 retries, 10s each = 60s total
+
+            if (!otp) {
+                console.log('   ❌ Could not fetch OTP from Gmail');
+                return false;
+            }
+
+            console.log(`   ✅ OTP retrieved: ${otp}`);
+
+            // Find OTP input using user-provided XPath
+            const otpInputSelectors = [
+                'xpath=/html/body/app-root/div/main/div/app-login/section/div/div/mat-card/form/div[2]/mat-form-field/div[1]/div/div[2]/input',
+                'input[placeholder*="one time password" i]',
+                'input[placeholder*="otp" i]',
+                'input[formcontrolname*="otp" i]',
+            ];
+
+            let otpInput: any = null;
+            for (const selector of otpInputSelectors) {
+                const input = this.page.locator(selector).first();
+                if (await input.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    otpInput = input;
+                    console.log(`   ✅ Found OTP input with: ${selector}`);
+                    break;
+                }
+            }
+
+            if (!otpInput) {
+                console.log('   ❌ OTP input field not found');
+                return false;
+            }
+
+            // Fill OTP
+            console.log('   ✏️  Filling OTP...');
+            await otpInput.fill(otp);
+            await new Promise(r => setTimeout(r, 500));
+
+            // Find and click Sign In button
+            const signInSelectors = [
+                'button:has-text("Sign in")',
+                'button:has-text("Sign In")',
+                'button:has-text("Submit")',
+                'button[type="submit"]',
+            ];
+
+            let signInButton: any = null;
+            for (const selector of signInSelectors) {
+                const button = this.page.locator(selector).first();
+                if (await button.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    signInButton = button;
+                    console.log(`   ✅ Found Sign In button with: ${selector}`);
+                    break;
+                }
+            }
+
+            if (!signInButton) {
+                console.log('   ⚠️ Sign In button not found, trying Enter key...');
+                await this.page.keyboard.press('Enter');
+            } else {
+                console.log('   🖱️  Clicking Sign In...');
+                await signInButton.click();
+            }
+
+            // Wait for navigation
+            await new Promise(r => setTimeout(r, 2000));
+
+            console.log('   ✅ OTP submitted successfully');
+            return true;
+
+        } catch (error) {
+            console.log('   ❌ Error handling OTP page:', error);
+            return false;
+        }
     }
 }

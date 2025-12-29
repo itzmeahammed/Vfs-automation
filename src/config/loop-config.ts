@@ -43,6 +43,15 @@ export interface LoopConfig {
     };
 
     /**
+     * Gmail settings for OTP fetching (VFS Italy)
+     */
+    gmail: {
+        enabled: boolean;
+        user: string;        // Your Gmail address
+        appPassword: string; // Gmail App Password (16 characters)
+    };
+
+    /**
      * VFS booking sub-category
      */
     subCategory: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family';
@@ -70,8 +79,8 @@ export const loopConfig: LoopConfig = {
 
     // Account credentials - add 2-3 accounts
     accounts: [
-        { email: 'ahammedx2@mailnesia.com', password: 'Trav@123' },
-        { email: 'ahammedx2@mailnesia.com', password: 'Trav@123' },
+        { email: 'carlomaria198711@gmail.com', password: 'Anypassw0rd@' },
+        { email: 'carlomaria198711@gmail.com', password: 'Anypassw0rd@' },
     ],
 
     // Check slot this many times per login (default: 5)
@@ -84,7 +93,14 @@ export const loopConfig: LoopConfig = {
     telegram: {
         enabled: true,  // Set to true to enable
         botToken: '8380612073:AAEEaPY_XMcJlsck_yzB2a8SN7cheXd10oE',  // Get from @BotFather
-        chatId: '-1003568600391',       // Your Telegram chat ID
+        chatId: '-1003422302979',       // Your Telegram chat ID
+    },
+
+    // Gmail settings for OTP (VFS Italy)
+    gmail: {
+        enabled: true,  // Set to true to enable OTP fetching
+        user: 'carlomaria198711@gmail.com',  // Your Gmail address
+        appPassword: 'mctm somb ortc pulv',  // Gmail App Password (16 chars)
     },
 
     // VFS sub-category

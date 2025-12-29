@@ -835,16 +835,15 @@ export class VFSBookingFlow {
                 }
             }
 
-            // Click E-Visa Tourist Single Entry (id=JUV4)
-            const optionSelectors = [
-                'mat-option#JUV4',
-                'mat-option:has-text("E-Visa - *Tourist Single Entry")',
-                'mat-option:has-text("Tourist Single Entry")',
-                'mat-option:has-text("E-Visa")',
+            // Click "Short Stay" option (Italy uses this)
+            const shortStayOptions = [
+                () => this.page.locator('mat-option').filter({ hasText: 'Short Stay' }).first(),
+                () => this.page.locator('mat-option:has-text("Short Stay")').first(),
+                () => this.page.locator('mat-option').getByText('Short Stay', { exact: false }).first(),
             ];
 
-            for (const selector of optionSelectors) {
-                const option = this.page.locator(selector).first();
+            for (const getOption of shortStayOptions) {
+                const option = getOption();
                 if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
                     const text = await option.textContent();
                     await option.click({ force: true });
@@ -854,9 +853,17 @@ export class VFSBookingFlow {
                 }
             }
 
-            // List all available options for debugging
-            const allOptions = await this.page.locator('mat-option').allTextContents();
-            console.log('   📋 Available options:', allOptions);
+            // Fallback: find by trimmed text content (handles " Short Stay " with spaces)
+            const allOptions = await this.page.locator('mat-option').all();
+            for (const opt of allOptions) {
+                const text = await opt.textContent();
+                if (text?.trim().toLowerCase() === 'short stay') {
+                    await opt.click({ force: true });
+                    console.log(`   ✅ Selected category: Short Stay (trimmed match)`);
+                    await new Promise(r => setTimeout(r, 1000));
+                    return true;
+                }
+            }
 
             console.log('   ❌ Could not find category option');
             return false;
@@ -870,8 +877,13 @@ export class VFSBookingFlow {
      * Select Sub-category based on config
      * Japan uses JUSV7 for "Single Entry Tourism General"
      */
+    /**
+     * Select Sub-category based on config
+     * Japan uses JUSV7 for "Single Entry Tourism General"
+     * Italy uses "TOURIST"
+     */
     private async selectSubCategory(): Promise<boolean> {
-        console.log('   � Looking for Sub-category dropdown...');
+        console.log('   📂 Selecting Sub-category...');
 
         try {
             // Wait for page to be stable after category selection - STRICT wait
@@ -907,83 +919,43 @@ export class VFSBookingFlow {
                 await new Promise(r => setTimeout(r, 1500));
             }
 
-            // Get the display text for the sub-category
+            // Get target text
             const subCategoryKey = this.config.subCategory.toLowerCase().replace(/\s+/g, '_');
-            const subCategoryText = SUB_CATEGORY_MAP[subCategoryKey] || this.config.subCategory;
 
-            console.log(`   🔍 Looking for: "${subCategoryText}"`);
-
-            // Try multiple selection strategies based on DOM structure
-            // From DOM: mat-option has id like "Tou" for Tourism, text in span.mdc-list-item__primary-text
-
-            // Strategy 1: By ID - Japan uses JUSV7 for Single Entry Tourism General
-            const idMap: Record<string, string> = {
-                'tourism': 'JUSV7',           // Japan: Single Entry Tourism General
-                'single_entry_tourism': 'JUSV7',
-                'business': 'BUS',
+            // Map keys to exact text in dropdown
+            const textMap: Record<string, string> = {
+                'tourism': 'TOURIST',
+                'business': 'Business',
                 'sports_cultural': 'Sports',
                 'visiting_family': 'Visit',
             };
 
-            const optionId = idMap[subCategoryKey];
-            if (optionId) {
-                const optionById = this.page.locator(`mat-option#${optionId}`);
-                if (await optionById.isVisible({ timeout: 2000 })) {
-                    await optionById.click({ force: true });
-                    console.log(`   ✅ Selected by ID: ${optionId}`);
-                    return true;
-                }
-            }
+            const targetText = textMap[subCategoryKey] || this.config.subCategory;
+            console.log(`   🔍 Looking for: "${targetText}"`);
 
-            // Strategy 2: Look for Single Entry Tourism General text
-            const japanOptions = [
-                () => this.page.locator('mat-option#JUSV7').first(),
-                () => this.page.locator('mat-option:has-text("Single Entry Tourism General")').first(),
-                () => this.page.locator('mat-option:has-text("Tourism General")').first(),
-            ];
-
-            for (const getOption of japanOptions) {
-                const option = getOption();
-                if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
-                    const text = await option.textContent();
-                    await option.click({ force: true });
-                    console.log(`   ✅ Selected Japan sub-category: ${text?.trim()}`);
-                    return true;
-                }
-            }
-
-            // Strategy 2: By text content in the option
-            const option = this.page.locator('mat-option').filter({ hasText: subCategoryText }).first();
-            if (await option.isVisible({ timeout: 2000 })) {
-                await this.behavior.naturalClick(option);
-                console.log(`   ✅ Selected: ${subCategoryText}`);
-                return true;
-            }
-
-            // Strategy 3: Find by span text
-            const spanOption = this.page.locator(`mat-option:has(span.mdc-list-item__primary-text:has-text("${subCategoryText}"))`).first();
-            if (await spanOption.isVisible({ timeout: 2000 })) {
-                await this.behavior.naturalClick(spanOption);
-                console.log(`   ✅ Selected via span: ${subCategoryText}`);
-                return true;
-            }
-
-            // Strategy 4: Get all options and find matching one
+            // Get all options
             const allOptions = await this.page.locator('mat-option').all();
             console.log(`   📋 Found ${allOptions.length} options in dropdown`);
 
             for (const opt of allOptions) {
                 const text = await opt.textContent();
-                console.log(`      - Option: "${text?.trim()}"`);
-                if (text?.toLowerCase().includes(subCategoryText.toLowerCase())) {
-                    await this.behavior.naturalClick(opt);
-                    console.log(`   ✅ Selected: ${text?.trim()}`);
+                const trimmedText = text?.trim() || '';
+                console.log(`      - Option: "${trimmedText}"`);
+
+                // Check for match (case-insensitive)
+                if (trimmedText.toLowerCase() === targetText.toLowerCase() ||
+                    (subCategoryKey === 'tourism' && trimmedText.toUpperCase() === 'TOURIST')) {
+
+                    await opt.click({ force: true });
+                    console.log(`   ✅ Selected sub-category: ${trimmedText}`);
+                    await new Promise(r => setTimeout(r, 1000));
                     return true;
                 }
             }
 
             console.log('   ❌ Could not find specified sub-category');
             return false;
+
         } catch (error) {
             console.log('   ❌ Error selecting Sub-category:', error);
             return false;
@@ -1097,7 +1069,7 @@ export class VFSBookingFlow {
 
     /**
      * Wait for Your Details page to load
-     * URL: https://visa.vfsglobal.com/are/en/jpn/your-details
+     * URL: https://visa.vfsglobal.com/are/en/ita/your-details
      */
     private async waitForYourDetailsPage(): Promise<boolean> {
         try {

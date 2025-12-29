@@ -186,7 +186,7 @@ ${getDetectionSummary(fingerprint)}
     console.log('🌐 Now opening VFS login page to test Turnstile...\n');
 
     try {
-        await page.goto('https://visa.vfsglobal.com/are/en/jpn/login', {
+        await page.goto('https://visa.vfsglobal.com/are/en/ita/login', {
             waitUntil: 'domcontentloaded',
             timeout: 30000,
         });

@@ -16,7 +16,7 @@ describe('EnvironmentMonitor', () => {
         it('should detect healthy state for normal content', async () => {
             const state = await monitor.detectState({
                 pageTitle: 'VFS Global - Login',
-                pageUrl: 'https://visa.vfsglobal.com/are/en/jpn/login',
+                pageUrl: 'https://visa.vfsglobal.com/are/en/ita/login',
                 pageContent: 'Enter your email and password to continue',
             });
 

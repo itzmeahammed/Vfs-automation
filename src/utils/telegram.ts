@@ -86,7 +86,7 @@ export async function sendSlotAlert(slotDate: string, accountEmail: string): Pro
 👉 Login NOW and complete booking
 ⚡ Slots fill up FAST!
 
-🔗 <a href="https://visa.vfsglobal.com/are/en/jpn/login">Click to Login</a>
+🔗 <a href="https://visa.vfsglobal.com/are/en/ita/login">Click to Login</a>
     `.trim();
 
     await sendTelegramMessage(message);

@@ -17,7 +17,7 @@ import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegra
 
 // VFS URLs
 const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/mlt/dashboard';
-const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/jpn/login';
+const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/ita/login';
 
 /**
  * Main Loop Runner Class
@@ -106,6 +106,10 @@ class LoopRunner {
         const loginResult = await loginFlow.execute({
             email: account.email,
             password: account.password,
+            gmailConfig: loopConfig.gmail.enabled ? {
+                user: loopConfig.gmail.user,
+                password: loopConfig.gmail.appPassword
+            } : undefined
         });
 
         if (!loginResult.success) {

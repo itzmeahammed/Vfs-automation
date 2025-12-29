@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 
         // Execute login flow
         const loginFlow = new VFSLoginFlow(page, {
-            loginUrl: process.env.VFS_LOGIN_URL || 'https://visa.vfsglobal.com/are/en/jpn/login',
+            loginUrl: process.env.VFS_LOGIN_URL || 'https://visa.vfsglobal.com/are/en/ita/login',
             screenshotOnError: true,
         });
 
