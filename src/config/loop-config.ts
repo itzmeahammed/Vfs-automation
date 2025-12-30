@@ -34,6 +34,15 @@ export interface LoopConfig {
     intervalMinutes: number;
 
     /**
+     * Strict Schedule: Run only at specific minutes of the hour (e.g. 29, 59)
+     * If enabled, 'intervalMinutes' is ignored.
+     */
+    schedule?: {
+        enabled: boolean;
+        minutes: number[]; // e.g. [29, 59]
+    };
+
+    /**
      * Telegram notification settings
      */
     telegram: {
@@ -75,8 +84,7 @@ export const loopConfig: LoopConfig = {
 
     // Account credentials - add 2-3 accounts
     accounts: [
-        { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },
-        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' }
     ],
 
     // Check slot this many times per login (default: 5)
@@ -84,6 +92,13 @@ export const loopConfig: LoopConfig = {
 
     // Wait this many minutes between account cycles (default: 12)
     intervalMinutes: 12,
+
+    // Strict Schedule: Run only at these minutes (e.g. XX:29, XX:59)
+    // If enabled, intervalMinutes is ignored.
+    schedule: {
+        enabled: true,
+        minutes: [29, 59],
+    },
 
     // Telegram settings
     telegram: {
@@ -96,11 +111,11 @@ export const loopConfig: LoopConfig = {
     subCategory: 'tourism',
 
     // Browser settings
-    headless: false,  // false = show browser window
+    headless: true,  // false = show browser window
     screenshots: true,
 
     // AWS IP Rotation (Enable ONLY on AWS EC2 with IAM Role)
-    rotateIP: false,
+    rotateIP: true,
 };
 
 /**

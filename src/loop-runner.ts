@@ -53,6 +53,11 @@ class LoopRunner {
 
         // Main infinite loop
         while (true) {
+            // Strict Scheduling: Wait BEFORE the cycle if enabled
+            if (loopConfig.schedule?.enabled) {
+                await this.waitForNextSchedule();
+            }
+
             this.cycleCount++;
             console.log('\n' + '═'.repeat(60));
             console.log(`🔄 CYCLE ${this.cycleCount} STARTING`);
@@ -80,13 +85,59 @@ class LoopRunner {
                 }
             }
 
-            // Wait for interval before next cycle
             console.log('\n' + '═'.repeat(60));
-            console.log(`⏳ CYCLE ${this.cycleCount} COMPLETE`);
-            console.log(`   Waiting ${loopConfig.intervalMinutes} minutes before next cycle...`);
+            console.log(`✅ CYCLE ${this.cycleCount} COMPLETE`);
             console.log('═'.repeat(60));
 
-            await this.sleep(loopConfig.intervalMinutes * 60 * 1000);
+            // Standard Interval: Wait AFTER the cycle if scheduling is DISABLED
+            if (!loopConfig.schedule?.enabled) {
+                console.log(`⏳ Waiting ${loopConfig.intervalMinutes} minutes before next cycle...`);
+                await this.sleep(loopConfig.intervalMinutes * 60 * 1000);
+            }
+        }
+    }
+
+    /**
+     * Calculate and wait for the next scheduled time slot
+     */
+    private async waitForNextSchedule(): Promise<void> {
+        const minutes = loopConfig.schedule?.minutes || [];
+        if (minutes.length === 0) {
+            console.log('⚠️ Schedule enabled but no minutes configured. Running immediately.');
+            return;
+        }
+
+        const now = new Date();
+        const candidates: Date[] = [];
+
+        // Generate candidate run times for current and next hour
+        for (const m of minutes) {
+            // Candidate in current hour
+            const c1 = new Date(now);
+            c1.setMinutes(m, 0, 0);
+            if (c1.getTime() > now.getTime()) candidates.push(c1);
+
+            // Candidate in next hour
+            const c2 = new Date(now);
+            c2.setHours(c2.getHours() + 1);
+            c2.setMinutes(m, 0, 0);
+            candidates.push(c2);
+        }
+
+        // Find the earliest future time
+        candidates.sort((a, b) => a.getTime() - b.getTime());
+        const nextRun = candidates[0];
+
+        if (nextRun) {
+            const waitMs = nextRun.getTime() - now.getTime();
+            const waitMinutes = (waitMs / 60000).toFixed(1);
+            console.log('\n' + '═'.repeat(60));
+            console.log(`📅 STRICT SCHEDULE ENGAGED`);
+            console.log(`   Next Run: ${nextRun.toLocaleTimeString()}`);
+            console.log(`   Waiting:  ${waitMinutes} minutes`);
+            console.log('═'.repeat(60));
+
+            await this.sleep(waitMs);
         }
     }
 
