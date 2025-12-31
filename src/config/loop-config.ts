@@ -89,7 +89,7 @@ export interface LoopConfig {
  */
 export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
-    mode: 'earliest_slot',
+    mode: 'full_scenario',
 
     // Account credentials - add 2-3 accounts
     accounts: [

@@ -25,6 +25,7 @@ import {
     type ApplicantDetails,
 } from '../config/applicant-config.js';
 import { delay } from '../config/timing-config.js';
+import { VFSYourDetailsFlow } from './vfs-your-details.js';
 
 export interface BookingConfig {
     /** Sub-category to select: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family' */
@@ -377,47 +378,35 @@ export class VFSBookingFlow {
                 if (detailsPageLoaded) {
                     await this.takeScreenshot('your-details-page');
 
-                    // Step 10: Fill the Your Details form
-                    const formFilled = await this.fillYourDetailsForm();
-                    await this.takeScreenshot('form-filled');
+                    // Step 10: Run the Specialized Your Details Flow
+                    const detailsFlow = new VFSYourDetailsFlow(this.page);
+                    const detailsSuccess = await detailsFlow.execute(this.config.applicant!);
+                    await this.takeScreenshot('details-flow-complete');
 
-                    if (formFilled) {
-                        // Step 11: Click Save button
-                        const saved = await this.clickSaveButton();
-                        await this.takeScreenshot('save-clicked');
+                    if (detailsSuccess) {
+                        // Step 12: Wait for Summary page and click Continue
+                        const continuedFromSummary = await this.waitForSummaryAndContinue();
+                        await this.takeScreenshot('summary-page');
 
-                        if (saved) {
-                            // Step 12: Wait for Summary page and click Continue
-                            const continuedFromSummary = await this.waitForSummaryAndContinue();
-                            await this.takeScreenshot('summary-page');
-
-                            if (continuedFromSummary) {
-                                // Step 13: Wait for Book Appointment page
-                                const bookAppointmentLoaded = await this.waitForBookAppointmentPage();
-                                await this.takeScreenshot('book-appointment-page');
-
-                                return {
-                                    success: true,
-                                    state: bookAppointmentLoaded ? 'book_appointment' : 'summary_page',
-                                    message: bookAppointmentLoaded
-                                        ? `Ready to book appointment! Slot: ${slotInfo}`
-                                        : `Summary complete, waiting for Book Appointment page. Slot: ${slotInfo}`,
-                                    earliestSlot: slotInfo,
-                                };
-                            }
+                        if (continuedFromSummary) {
+                            // Step 13: Wait for Book Appointment page
+                            const bookAppointmentLoaded = await this.waitForBookAppointmentPage();
+                            await this.takeScreenshot('book-appointment-page');
 
                             return {
                                 success: true,
-                                state: 'details_filled',
-                                message: `Form saved but could not continue from Summary. Slot: ${slotInfo}`,
+                                state: bookAppointmentLoaded ? 'book_appointment' : 'summary_page',
+                                message: bookAppointmentLoaded
+                                    ? `Ready to book appointment! Slot: ${slotInfo}`
+                                    : `Summary complete, waiting for Book Appointment page. Slot: ${slotInfo}`,
                                 earliestSlot: slotInfo,
                             };
                         }
 
                         return {
                             success: true,
-                            state: 'details_page',
-                            message: `Form filled but Save failed. Slot: ${slotInfo}`,
+                            state: 'details_filled',
+                            message: `Form saved but could not continue from Summary. Slot: ${slotInfo}`,
                             earliestSlot: slotInfo,
                         };
                     }
@@ -425,7 +414,7 @@ export class VFSBookingFlow {
                     return {
                         success: true,
                         state: 'details_page',
-                        message: `On Your Details page but form fill had issues. Slot: ${slotInfo}`,
+                        message: `Your Details Flow failed. Slot: ${slotInfo}`,
                         earliestSlot: slotInfo,
                     };
                 }
