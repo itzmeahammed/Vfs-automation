@@ -52,12 +52,15 @@ export interface LoopConfig {
     };
 
     /**
-     * Gmail settings for OTP fetching (VFS Italy)
+     * Email settings for OTP fetching (VFS Italy)
+     * Supports:
+     * - Gmail (requires App Password)
+     * - Mailnesia (public RSS, no password required)
      */
     gmail: {
         enabled: boolean;
-        user: string;        // Your Gmail address
-        appPassword: string; // Gmail App Password (16 characters)
+        user: string;        // Gmail or Mailnesia address
+        appPassword: string; // Gmail App Password (leave empty for Mailnesia)
     };
 
     /**
@@ -93,7 +96,7 @@ export const loopConfig: LoopConfig = {
 
     // Account credentials - add 2-3 accounts
     accounts: [
-        { email: 'carlomaria198711@gmail.com', password: 'Anypassw0rd@' },
+        { email: 'abeerporto7@gmail.com', password: 'Trav@123' },
     ],
 
     // Check slot this many times per login (default: 5)
@@ -116,11 +119,11 @@ export const loopConfig: LoopConfig = {
         chatId: '-1003422302979',       // Your Telegram chat ID
     },
 
-    // Gmail settings for OTP (VFS Italy)
+    // Email settings for OTP (VFS Italy)
     gmail: {
         enabled: true,  // Set to true to enable OTP fetching
-        user: 'carlomaria198711@gmail.com',  // Your Gmail address
-        appPassword: 'mctm somb ortc pulv',  // Gmail App Password (16 chars)
+        user: 'abeerporto7@gmail.com',  // Gmail or Mailnesia address
+        appPassword: 'hrkg mylh pqbm xrbm',  // App Password (only for Gmail)
     },
 
     // VFS sub-category
