@@ -37,6 +37,7 @@ export interface LoginFlowConfig {
     loginUrl: string;
     maxAttempts: number;
     screenshotOnError: boolean;
+    screenshots?: boolean;
 }
 
 const DEFAULT_CONFIG: LoginFlowConfig = {
@@ -319,6 +320,12 @@ export class VFSLoginFlow {
             // Fill email INSTANTLY (Native fill)
             console.log('   📧 Entering email...');
             await emailInput.fill(credentials.email);
+
+            // Take screenshot after email (User Request)
+            if (this.config.screenshotOnError || this.config.screenshots) {
+                await this.page.screenshot({ path: './screenshots/email_entered.png' });
+                console.log('   📸 Screenshot saved: ./screenshots/email_entered.png');
+            }
 
             // Find password input
             const passwordInput = await this.findLoginField('password');

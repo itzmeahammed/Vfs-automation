@@ -131,7 +131,7 @@ export const loopConfig: LoopConfig = {
     screenshots: true,
 
     // AWS IP Rotation (Enable ONLY on AWS EC2 with IAM Role)
-    rotateIP: true,
+    rotateIP: false,
 };
 
 /**
