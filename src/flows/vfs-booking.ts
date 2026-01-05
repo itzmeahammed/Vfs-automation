@@ -1,11 +1,11 @@
 /**
- * VFS Global Malta Booking Flow
+ * VFS Global Italy Booking Flow
  * 
  * Philosophy: "Handle post-login booking steps with the same human-like behavior."
  * 
  * This module handles:
  * 1. Clicking "Start New Booking" on dashboard
- * 2. Selecting Application Centre (Malta Visa application center - Dubai/Abu Dhabi)
+ * 2. Selecting Application Centre (Italy Visa application center - Dubai/Abu Dhabi)
  * 3. Category auto-selects as "Short Stay"
  * 4. Selecting Sub-category (from config: Tourism, Business, etc.)
  * 5. Detecting earliest available slot date
@@ -29,12 +29,18 @@ import { delay } from '../config/timing-config.js';
 export interface BookingConfig {
     /** Sub-category to select: 'tourism' | 'business' | 'sports_cultural' | 'visiting_family' */
     subCategory: string;
-    /** Application centre to select (default: Malta Visa application center- Dubai) */
+    /** Application centre to select (default: Italy Visa application center- Dubai) */
     applicationCentre?: string;
     /** Applicant details for form filling */
     applicant?: ApplicantDetails;
     /** Booking mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking) */
     mode?: 'earliest_slot' | 'full_scenario';
+    /** Visa type info for notifications */
+    visaType?: {
+        name: string;
+        centre: string;
+        category: string;
+    };
 }
 
 export interface BookingResult {
@@ -43,6 +49,7 @@ export interface BookingResult {
     message: string;
     earliestSlot?: string;
     screenshot?: string;
+    visaType?: string;  // e.g., "Dubai, Tourist" or "Dubai, Schengen"
 }
 
 const SUB_CATEGORY_MAP: Record<string, string> = {
@@ -57,11 +64,16 @@ const DEFAULT_CONFIG: BookingConfig = {
     subCategory: vfsConfig.booking.subCategory,
     applicationCentre: APPLICATION_CENTRES[vfsConfig.booking.applicationCentre],
     applicant: vfsConfig.applicant,
+    visaType: {
+        name: 'Tourist',
+        centre: vfsConfig.booking.applicationCentre,
+        category: 'Short Stay',
+    },
 };
 
 
 /**
- * VFS Malta Booking Flow Orchestrator
+ * VFS Italy Booking Flow Orchestrator
  * 
  * Handles the booking form after successful login.
  */
@@ -218,7 +230,7 @@ export class VFSBookingFlow {
      */
     async execute(): Promise<BookingResult> {
         console.log('\n' + '═'.repeat(60));
-        console.log('📋 VFS Malta Booking Flow - Starting');
+        console.log('📋 VFS Italy Booking Flow - Starting');
         console.log('═'.repeat(60) + '\n');
 
         try {
@@ -291,43 +303,54 @@ export class VFSBookingFlow {
             }
 
             // Step 6: Select Sub-category dropdown with retry
-            console.log('📁 Selecting Sub-category...');
-            let subCategorySelected = false;
-            for (let retry = 1; retry <= 3; retry++) {
-                console.log(`   📍 Sub-category attempt ${retry}/3...`);
-                subCategorySelected = await this.selectSubCategory();
-                if (subCategorySelected) {
-                    await this.waitForLoader();
-                    // Verify selection
-                    const verified = await this.verifyDropdownSelected(2);
-                    if (verified) {
-                        console.log('   ✅ Sub-category selected and verified');
-                        break;
-                    }
-                }
-                await delay(500);
-            }
-            if (!subCategorySelected) {
-                await this.takeScreenshot('subcategory-selection-failed');
-                console.log('   ❌ Sub-category selection failed after 3 attempts');
-                return {
-                    success: false,
-                    state: 'failed',
-                    message: 'Could not select Sub-category',
-                };
-            }
-            await this.takeScreenshot('subcategory-selected');
+            // SKIP sub-category for Schengen (auto-selects to "Schengen - Visa")
+            const isSchengen = this.config.visaType?.category?.toLowerCase().includes('schengen');
 
-            // Wait for loader to disappear after sub-category selection
+            if (isSchengen) {
+                console.log('📁 Sub-category: Schengen auto-selects, skipping manual selection');
+                console.log('   ✅ Sub-category will auto-fill to "Schengen - Visa"');
+            } else {
+                console.log('📁 Selecting Sub-category...');
+                let subCategorySelected = false;
+                for (let retry = 1; retry <= 3; retry++) {
+                    console.log(`   📍 Sub-category attempt ${retry}/3...`);
+                    subCategorySelected = await this.selectSubCategory();
+                    if (subCategorySelected) {
+                        await this.waitForLoader();
+                        // Verify selection
+                        const verified = await this.verifyDropdownSelected(2);
+                        if (verified) {
+                            console.log('   ✅ Sub-category selected and verified');
+                            break;
+                        }
+                    }
+                    await delay(500);
+                }
+                if (!subCategorySelected) {
+                    await this.takeScreenshot('subcategory-selection-failed');
+                    console.log('   ❌ Sub-category selection failed after 3 attempts');
+                    return {
+                        success: false,
+                        state: 'failed',
+                        message: 'Could not select Sub-category',
+                    };
+                }
+                await this.takeScreenshot('subcategory-selected');
+            }
+
+            // Wait for loader to disappear after category/sub-category selection
             console.log('\n   ⏳ Waiting for loader to disappear...');
             await this.waitForLoader();  // Wait until loader is gone
 
-            // Step 7: ALL 3 DROPDOWNS SELECTED - Now detect earliest available slot
-            console.log('\n   ✅ All 3 dropdowns filled successfully!');
+            // Step 7: ALL DROPDOWNS SELECTED - Now detect earliest available slot
+            const categoryName = this.config.visaType?.category || 'Short Stay';
+            const subCategoryName = isSchengen ? 'Schengen - Visa' : (SUB_CATEGORY_MAP[this.config.subCategory] || this.config.subCategory);
+
+            console.log('\n   ✅ All dropdowns filled successfully!');
             console.log('   📋 Form Summary:');
             console.log(`      - Centre: ${this.config.applicationCentre}`);
-            console.log(`      - Category: E-Visa Tourist Single Entry`);
-            console.log(`      - Sub-category: ${SUB_CATEGORY_MAP[this.config.subCategory] || this.config.subCategory}`);
+            console.log(`      - Category: ${categoryName}`);
+            console.log(`      - Sub-category: ${subCategoryName}`);
             console.log('\n   ⏳ Waiting 5 seconds for slot info to render...');
             await new Promise(r => setTimeout(r, 5000));  // STRICT 5 second wait (not affected by timing mode)
             console.log('   ✅ 5-second wait complete!');
@@ -340,6 +363,9 @@ export class VFSBookingFlow {
             if (slotInfo) {
                 console.log(`\n🎯 SLOTS FOUND:\n${slotInfo}`);
 
+                // Generate visa type label for notifications
+                const visaTypeLabel = this.getVisaTypeLabel();
+
                 // Check mode - return early for EARLIEST_SLOT, continue for FULL_SCENARIO
                 if (this.config.mode !== 'full_scenario') {
                     // EARLIEST_SLOT MODE: Return immediately with slot info
@@ -349,6 +375,7 @@ export class VFSBookingFlow {
                         state: 'slot_found',
                         message: 'Slots found!',
                         earliestSlot: slotInfo,
+                        visaType: visaTypeLabel,
                     };
                 }
 
@@ -438,10 +465,13 @@ export class VFSBookingFlow {
                 };
             }
 
+            // No slot found - include visa type in message
+            const visaTypeLabel = this.getVisaTypeLabel();
             return {
                 success: true,
                 state: 'form_filled',
                 message: 'Form filled, but no slot info found yet',
+                visaType: visaTypeLabel,
             };
 
         } catch (error) {
@@ -454,30 +484,75 @@ export class VFSBookingFlow {
                 state: 'failed',
                 message: `Booking error: ${error instanceof Error ? error.message : 'Unknown'}`,
                 screenshot: screenshotPath,
+                visaType: this.getVisaTypeLabel(),
             };
         }
     }
 
     /**
+     * Generate visa type label for notifications
+     * Format: "Dubai, Tourist" or "Abu Dhabi, Schengen"
+     */
+    private getVisaTypeLabel(): string {
+        const centre = this.config.visaType?.centre || 'dubai';
+        const name = this.config.visaType?.name || 'Tourist';
+
+        // Capitalize first letter
+        const centreLabel = centre.charAt(0).toUpperCase() + centre.slice(1);
+
+        return `${centreLabel}, ${name}`;
+    }
+
+    /**
      * Wait for dashboard page to load after login
+     * ROBUST VERSION: Waits for loader, retries, multiple fallbacks
      */
     private async waitForDashboard(): Promise<boolean> {
         console.log('🏠 Waiting for dashboard...');
 
         try {
-            // Check if we're already on dashboard or need to navigate
+            // Step 1: Check if we're already on dashboard or need to navigate
             const currentUrl = this.page.url();
             if (!currentUrl.includes('/dashboard')) {
                 console.log('   ⏳ Not on dashboard yet, waiting for redirect...');
-                await this.page.waitForURL('**/dashboard', { timeout: 50000 });
+                await this.page.waitForURL('**/dashboard', { timeout: 60000 });
             }
 
             console.log('   📍 URL confirmed: dashboard page');
 
-            // Wait a bit for Angular to render
-            await new Promise(r => setTimeout(r, 3000));
+            // Step 2: Wait for Angular loader/spinner to disappear (CRITICAL!)
+            console.log('   ⏳ Waiting for page loader to disappear...');
+            const loaderSelectors = [
+                '.loader',
+                '.spinner',
+                '.loading',
+                'mat-spinner',
+                '.mat-progress-spinner',
+                '.mat-mdc-progress-spinner',
+                'mat-progress-spinner',
+                '.cdk-overlay-backdrop',
+                '[role="progressbar"]',
+            ];
 
-            // Try multiple approaches to find the button
+            // Wait up to 30 seconds for loader to disappear
+            for (const selector of loaderSelectors) {
+                try {
+                    const loader = this.page.locator(selector);
+                    if (await loader.isVisible({ timeout: 1000 }).catch(() => false)) {
+                        console.log(`   🔄 Found loader: ${selector}, waiting for it to disappear...`);
+                        await loader.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => { });
+                        console.log('   ✅ Loader disappeared!');
+                    }
+                } catch {
+                    // Loader not found or already gone
+                }
+            }
+
+            // Step 3: Additional wait for Angular rendering
+            console.log('   ⏳ Waiting 5 seconds for dashboard to fully render...');
+            await new Promise(r => setTimeout(r, 5000));
+
+            // Step 4: Try multiple approaches to find the "Start New Booking" button with RETRIES
             const buttonSelectors = [
                 // Most specific - from actual DOM inspection
                 'button.custom-height-button',
@@ -487,30 +562,44 @@ export class VFSBookingFlow {
                 'button[mat-raised-button]',
                 // By text content
                 'button:has-text("Start New Booking")',
+                'a:has-text("Start New Booking")',
                 // By class patterns
                 'button.mdc-button--raised',
-                // Fallback
                 'button.mat-mdc-raised-button',
+                'button.mat-raised-button',
+                // Very generic
+                'button:has-text("Booking")',
             ];
 
             let buttonFound = false;
+            const maxRetries = 3;
 
-            for (const selector of buttonSelectors) {
-                try {
-                    const button = this.page.locator(selector).first();
-                    const isVisible = await button.isVisible({ timeout: 3000 });
+            for (let retry = 1; retry <= maxRetries && !buttonFound; retry++) {
+                console.log(`   🔍 Button search attempt ${retry}/${maxRetries}...`);
 
-                    if (isVisible) {
-                        // Double-check text content
-                        const text = await button.textContent().catch(() => '');
-                        if (text?.includes('Start New Booking') || text?.includes('New Booking')) {
-                            console.log(`   ✅ Found button with selector: ${selector}`);
-                            buttonFound = true;
-                            break;
+                for (const selector of buttonSelectors) {
+                    try {
+                        const button = this.page.locator(selector).first();
+                        const isVisible = await button.isVisible({ timeout: 5000 });
+
+                        if (isVisible) {
+                            // Double-check text content
+                            const text = await button.textContent().catch(() => '');
+                            if (text?.includes('Start New Booking') || text?.includes('New Booking') || text?.includes('Booking')) {
+                                console.log(`   ✅ Found button with selector: ${selector}`);
+                                console.log(`   📝 Button text: "${text.trim()}"`);
+                                buttonFound = true;
+                                break;
+                            }
                         }
+                    } catch {
+                        continue;
                     }
-                } catch {
-                    continue;
+                }
+
+                if (!buttonFound && retry < maxRetries) {
+                    console.log(`   ⏳ Button not found, waiting 3 seconds before retry ${retry + 1}...`);
+                    await new Promise(r => setTimeout(r, 3000));
                 }
             }
 
@@ -519,23 +608,33 @@ export class VFSBookingFlow {
                 console.log('   ⚠️ Button not found by selector, checking page content...');
                 const pageContent = await this.page.textContent('body').catch(() => '');
 
-                if (pageContent?.includes('Start New Booking')) {
-                    console.log('   ✅ Dashboard content found via text search');
-                    buttonFound = true;
-                } else if (pageContent?.includes('Active application')) {
-                    console.log('   ✅ Dashboard loaded (Active applications visible)');
-                    buttonFound = true;
+                // Multiple fallback checks
+                const indicators = [
+                    'Start New Booking',
+                    'New Booking',
+                    'Active application',
+                    'Booking Appointment',
+                    'My Account',
+                    'Dashboard',
+                ];
+
+                for (const indicator of indicators) {
+                    if (pageContent?.includes(indicator)) {
+                        console.log(`   ✅ Dashboard content found via text: "${indicator}"`);
+                        buttonFound = true;
+                        break;
+                    }
                 }
             }
 
             if (buttonFound) {
-                console.log('   ✅ Dashboard loaded');
+                console.log('   ✅ Dashboard loaded successfully!');
                 // Human pause to "observe" the page
                 await new Promise(r => setTimeout(r, this.timing.getThinkingPause('simple')));
                 return true;
             }
 
-            console.log('   ❌ Could not verify dashboard content');
+            console.log('   ❌ Could not verify dashboard content after all retries');
             return false;
         } catch (error) {
             console.log('   ❌ Dashboard wait failed:', error);
@@ -835,14 +934,18 @@ export class VFSBookingFlow {
                 }
             }
 
-            // Click "Short Stay" option (Italy uses this)
-            const shortStayOptions = [
-                () => this.page.locator('mat-option').filter({ hasText: 'Short Stay' }).first(),
-                () => this.page.locator('mat-option:has-text("Short Stay")').first(),
-                () => this.page.locator('mat-option').getByText('Short Stay', { exact: false }).first(),
+            // Determine which category to select based on config
+            const targetCategory = this.config.visaType?.category || 'Short Stay';
+            console.log(`   🔍 Looking for category: "${targetCategory}"`);
+
+            // Click the target category option
+            const categoryOptions = [
+                () => this.page.locator('mat-option').filter({ hasText: targetCategory }).first(),
+                () => this.page.locator(`mat-option:has-text("${targetCategory}")`).first(),
+                () => this.page.locator('mat-option').getByText(targetCategory, { exact: false }).first(),
             ];
 
-            for (const getOption of shortStayOptions) {
+            for (const getOption of categoryOptions) {
                 const option = getOption();
                 if (await option.isVisible({ timeout: 1000 }).catch(() => false)) {
                     const text = await option.textContent();
@@ -853,13 +956,13 @@ export class VFSBookingFlow {
                 }
             }
 
-            // Fallback: find by trimmed text content (handles " Short Stay " with spaces)
+            // Fallback: find by trimmed text content
             const allOptions = await this.page.locator('mat-option').all();
             for (const opt of allOptions) {
                 const text = await opt.textContent();
-                if (text?.trim().toLowerCase() === 'short stay') {
+                if (text?.trim().toLowerCase() === targetCategory.toLowerCase()) {
                     await opt.click({ force: true });
-                    console.log(`   ✅ Selected category: Short Stay (trimmed match)`);
+                    console.log(`   ✅ Selected category: ${targetCategory} (trimmed match)`);
                     await new Promise(r => setTimeout(r, 1000));
                     return true;
                 }

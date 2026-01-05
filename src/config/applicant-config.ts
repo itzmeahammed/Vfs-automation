@@ -1,5 +1,5 @@
 /**
- * VFS Malta Visa Application Configuration
+ * VFS Italy Visa Application Configuration
  * 
  * Fill in your details below. These will be used to:
  * 1. Select the application centre and category
@@ -74,8 +74,8 @@ export const vfsConfig: VFSConfig = {
 
     booking: {
         // Application Centre
-        // 'dubai' = Malta Visa application center- Dubai
-        // 'abudhabi' = Malta Visa application center- Abu Dhabi
+        // 'dubai' = Italy Visa application center- Dubai
+        // 'abudhabi' = Italy Visa application center- Abu Dhabi
         applicationCentre: 'dubai',
 
         // Visa Category (Short Stay is auto-selected)
@@ -92,8 +92,8 @@ export const vfsConfig: VFSConfig = {
 // ═══════════════════════════════════════════════════════════════
 
 export const APPLICATION_CENTRES = {
-    dubai: 'Malta Visa application center- Dubai',
-    abudhabi: 'Malta Visa application center- Abu Dhabi',
+    dubai: 'Italy Visa application center- Dubai',
+    abudhabi: 'Italy Visa application center- Abu Dhabi',
 } as const;
 
 export const SUB_CATEGORIES = {

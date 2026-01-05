@@ -34,7 +34,7 @@ class LoopRunner {
         console.log('═'.repeat(60));
         console.log(`   Mode: ${loopConfig.mode.toUpperCase()}`);
         console.log(`   Accounts: ${loopConfig.accounts.length}`);
-        console.log(`   Slots per login: ${loopConfig.slotsPerLogin}`);
+        console.log(`   Visa Types: ${loopConfig.visaTypes?.length || 1} types to check per login`);
         console.log(`   Interval: ${loopConfig.intervalMinutes} minutes`);
         console.log(`   Telegram: ${loopConfig.telegram.enabled ? 'Enabled' : 'Disabled'}`);
         console.log('═'.repeat(60) + '\n');
@@ -55,6 +55,32 @@ class LoopRunner {
         while (true) {
             // Strict Scheduling: Wait BEFORE the cycle if enabled
             if (loopConfig.schedule?.enabled) {
+                // If account mapping is enabled, wait for next scheduled account
+                if (loopConfig.schedule.accountMapping?.enabled) {
+                    const { accountIndex, minute } = await this.waitForNextScheduledAccount();
+
+                    this.cycleCount++;
+                    console.log('\n' + '═'.repeat(60));
+                    console.log(`🔄 CYCLE ${this.cycleCount} - Account ${accountIndex + 1} at :${minute.toString().padStart(2, '0')}`);
+                    console.log('═'.repeat(60));
+
+                    // Process only the scheduled account
+                    const account = loopConfig.accounts[accountIndex];
+                    console.log(`\n📧 Account ${accountIndex + 1}/${loopConfig.accounts.length}: ${account.email}`);
+
+                    try {
+                        await this.processAccount(account, accountIndex);
+                    } catch (error) {
+                        console.log(`❌ Error with account ${account.email}:`, error);
+                        await sendErrorAlert(String(error), account.email);
+                    }
+
+                    // Close browser after account
+                    await this.closeBrowser();
+                    continue; // Skip the normal account loop
+                }
+
+                // Normal schedule mode - all accounts run at same time
                 await this.waitForNextSchedule();
             }
 
@@ -142,6 +168,63 @@ class LoopRunner {
     }
 
     /**
+     * Calculate and wait for the next scheduled account (account mapping mode)
+     * Returns the account index and minute to run
+     */
+    private async waitForNextScheduledAccount(): Promise<{ accountIndex: number; minute: number }> {
+        const mapping = loopConfig.schedule?.accountMapping?.mapping || [];
+        if (mapping.length === 0) {
+            console.log('⚠️ Account mapping enabled but no mapping configured. Using account 0.');
+            return { accountIndex: 0, minute: 0 };
+        }
+
+        const now = new Date();
+        const candidates: Array<{ time: Date; accountIndex: number; minute: number }> = [];
+
+        // Generate candidate run times for each account
+        for (let accIndex = 0; accIndex < loopConfig.accounts.length; accIndex++) {
+            const assignedMinute = mapping[accIndex];
+            if (assignedMinute === undefined) continue;
+
+            // Candidate in current hour
+            const c1 = new Date(now);
+            c1.setMinutes(assignedMinute, 0, 0);
+            if (c1.getTime() > now.getTime()) {
+                candidates.push({ time: c1, accountIndex: accIndex, minute: assignedMinute });
+            }
+
+            // Candidate in next hour
+            const c2 = new Date(now);
+            c2.setHours(c2.getHours() + 1);
+            c2.setMinutes(assignedMinute, 0, 0);
+            candidates.push({ time: c2, accountIndex: accIndex, minute: assignedMinute });
+        }
+
+        // Find the earliest future time
+        candidates.sort((a, b) => a.time.getTime() - b.time.getTime());
+        const nextRun = candidates[0];
+
+        if (nextRun) {
+            const waitMs = nextRun.time.getTime() - now.getTime();
+            const waitMinutes = (waitMs / 60000).toFixed(1);
+            const account = loopConfig.accounts[nextRun.accountIndex];
+
+            console.log('\n' + '═'.repeat(60));
+            console.log(`📅 ACCOUNT-SPECIFIC SCHEDULE`);
+            console.log(`   Account ${nextRun.accountIndex + 1}: ${account.email}`);
+            console.log(`   Next Run: ${nextRun.time.toLocaleTimeString()} (:${nextRun.minute.toString().padStart(2, '0')})`);
+            console.log(`   Waiting:  ${waitMinutes} minutes`);
+            console.log('═'.repeat(60));
+
+            await this.sleep(waitMs);
+            return { accountIndex: nextRun.accountIndex, minute: nextRun.minute };
+        }
+
+        // Fallback
+        return { accountIndex: 0, minute: 0 };
+    }
+
+    /**
      * Process a single account - login, check slots N times, logout
      */
     private async processAccount(account: AccountCredentials, accountIndex: number): Promise<void> {
@@ -155,13 +238,18 @@ class LoopRunner {
             loginUrl: VFS_LOGIN_URL,
             screenshotOnError: true,
         });
+
+        // Determine Gmail config for this account
+        // Use account-specific gmailAppPassword if set, otherwise fall back to global config
+        const gmailConfig = loopConfig.gmail.enabled ? {
+            user: account.email,  // Use account's own email for OTP
+            password: account.gmailAppPassword || loopConfig.gmail.appPassword  // Account-specific or global
+        } : undefined;
+
         const loginResult = await loginFlow.execute({
             email: account.email,
             password: account.password,
-            gmailConfig: loopConfig.gmail.enabled ? {
-                user: loopConfig.gmail.user,
-                password: loopConfig.gmail.appPassword
-            } : undefined
+            gmailConfig: gmailConfig
         });
 
         if (!loginResult.success) {
@@ -172,16 +260,40 @@ class LoopRunner {
         console.log('✅ Login successful');
         await sendStatusUpdate(`✅ Logged in: ${account.email}`);
 
-        // Check slots N times
-        for (let slotCheck = 1; slotCheck <= loopConfig.slotsPerLogin; slotCheck++) {
-            console.log(`\n🔍 Slot check ${slotCheck}/${loopConfig.slotsPerLogin}...`);
+        // Determine visa types to check
+        const visaTypes = loopConfig.visaTypes && loopConfig.visaTypes.length > 0
+            ? loopConfig.visaTypes
+            : [{
+                name: 'Tourist',
+                centre: 'dubai',
+                category: 'Short Stay',
+                subCategory: loopConfig.subCategory
+            }];
+
+        console.log(`\n📋 Will check ${visaTypes.length} visa type(s):`);
+        visaTypes.forEach((vt, idx) => {
+            console.log(`   ${idx + 1}. ${vt.centre.toUpperCase()}, ${vt.name} (${vt.category})`);
+        });
+
+        // Check each visa type
+        for (let visaTypeIndex = 0; visaTypeIndex < visaTypes.length; visaTypeIndex++) {
+            const visaType = visaTypes[visaTypeIndex];
+            const visaLabel = `${visaType.centre.charAt(0).toUpperCase() + visaType.centre.slice(1)}, ${visaType.name}`;
+
+            console.log(`\n${'═'.repeat(60)}`);
+            console.log(`🎯 Checking: ${visaLabel}`);
+            console.log(`${'═'.repeat(60)}`);
 
             try {
-                const slotResult = await this.checkEarliestSlot();
+                const slotResult = await this.checkEarliestSlot(visaType);
 
                 if (slotResult.found) {
-                    console.log(`🎯 SLOT FOUND: ${slotResult.date}`);
-                    await sendSlotAlert(slotResult.date || 'Unknown date', account.email);
+                    console.log(`🎯 SLOT FOUND for ${visaLabel}: ${slotResult.date}`);
+                    await sendSlotAlert(
+                        slotResult.date || 'Unknown date',
+                        account.email,
+                        visaLabel
+                    );
 
                     // If full_scenario mode, continue booking
                     if (loopConfig.mode === 'full_scenario') {
@@ -189,20 +301,20 @@ class LoopRunner {
                         // TODO: Continue with full booking flow
                     }
                 } else if (slotResult.error) {
-                    console.log(`   ⚠️ Failed: ${slotResult.error}`);
-                    await sendStatusUpdate(`⚠️ Failed: ${slotResult.error}\\n📧 ${account.email}`);
+                    console.log(`   ⚠️ Failed for ${visaLabel}: ${slotResult.error}`);
+                    await sendStatusUpdate(`⚠️ Failed: ${slotResult.error}\n📍 ${visaLabel}\n📧 ${account.email}`);
                 } else {
-                    console.log('   ❌ No slot available');
-                    await sendStatusUpdate(`❌ No slot - Check ${slotCheck}/${loopConfig.slotsPerLogin}\\n📧 ${account.email}`);
+                    console.log(`   ❌ No slot for ${visaLabel}`);
+                    await sendStatusUpdate(`❌ No slot for ${visaLabel}\n📧 ${account.email}`);
                 }
 
-                // Go back to dashboard for next check (if not last)
-                if (slotCheck < loopConfig.slotsPerLogin) {
+                // Go back to dashboard for next visa type (if not last)
+                if (visaTypeIndex < visaTypes.length - 1) {
                     await this.goBackToDashboard();
                     await delay(500);  // Faster!
                 }
             } catch (error) {
-                console.log(`   ❌ Error checking slot: ${error}`);
+                console.log(`   ❌ Error checking ${visaLabel}: ${error}`);
             }
         }
 
@@ -221,11 +333,27 @@ class LoopRunner {
     /**
      * Check earliest slot - goes through booking flow until slot detection
      */
-    private async checkEarliestSlot(): Promise<{ found: boolean; date?: string; error?: string }> {
+    private async checkEarliestSlot(visaType: any): Promise<{ found: boolean; date?: string; error?: string }> {
         if (!this.page) return { found: false, error: 'No page available' };
 
-        // Pass the mode from loopConfig to booking flow
-        const bookingFlow = new VFSBookingFlow(this.page, { mode: loopConfig.mode });
+        // Map visa type to application centre
+        const APPLICATION_CENTRES: Record<string, string> = {
+            dubai: 'Italy Visa application center- Dubai',
+            abudhabi: 'Italy Visa application center- Abu Dhabi',
+        };
+
+        // Pass the mode and visa type info to booking flow
+        const bookingFlow = new VFSBookingFlow(this.page, {
+            mode: loopConfig.mode,
+            subCategory: visaType.subCategory,
+            applicationCentre: APPLICATION_CENTRES[visaType.centre],
+            visaType: {
+                name: visaType.name,
+                centre: visaType.centre,
+                category: visaType.category,
+            },
+        });
+
         const result = await bookingFlow.execute();
 
         if (result.success && result.earliestSlot) {

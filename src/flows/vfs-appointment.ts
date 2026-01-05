@@ -1,5 +1,5 @@
 /**
- * VFS Global Malta - Book Appointment Flow
+ * VFS Global Italy - Book Appointment Flow
  * 
  * Philosophy: "Handle appointment booking with human-like behavior."
  * 
@@ -38,7 +38,7 @@ export interface ReviewDetails {
 }
 
 /**
- * VFS Malta Appointment Booking Flow
+ * VFS Italy Appointment Booking Flow
  * 
  * DOM Structure:
  * - Calendar: full-calendar with fc-daygrid-body
@@ -115,7 +115,7 @@ export class VFSAppointmentFlow {
 
     async execute(): Promise<AppointmentResult> {
         console.log('\n' + '═'.repeat(60));
-        console.log('📅 VFS Malta Appointment Booking Flow');
+        console.log('📅 VFS Italy Appointment Booking Flow');
         console.log('═'.repeat(60) + '\n');
 
         try {
@@ -628,7 +628,7 @@ export class VFSAppointmentFlow {
 
             // Extract Visa Category
             try {
-                const catText = await this.page.locator('text=/Malta/i, text=/Schengen/i').first().textContent();
+                const catText = await this.page.locator('text=/Italy/i, text=/Schengen/i').first().textContent();
                 if (catText) {
                     details.visaCategory = catText.trim();
                     console.log(`   🛂 Category: ${details.visaCategory}`);

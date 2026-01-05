@@ -51,7 +51,7 @@ export async function sendTelegramMessage(message: string): Promise<boolean> {
 /**
  * Send slot found alert with enhanced visual formatting
  */
-export async function sendSlotAlert(slotDate: string, accountEmail: string): Promise<void> {
+export async function sendSlotAlert(slotDate: string, accountEmail: string, visaType?: string): Promise<void> {
     // Parse the slot dates from the formatted string
     const slots = slotDate.split('\n').filter(line => line.trim());
 
@@ -68,6 +68,8 @@ export async function sendSlotAlert(slotDate: string, accountEmail: string): Pro
         }
     });
 
+    const visaTypeInfo = visaType ? `📍 <b>Visa Type:</b> ${visaType}\n` : '';
+
     const message = `
 🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
 ⚡ <b>VFS SLOTS AVAILABLE!</b> ⚡
@@ -77,7 +79,7 @@ export async function sendSlotAlert(slotDate: string, accountEmail: string): Pro
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-👤 <b>Account:</b> <code>${accountEmail}</code>
+${visaTypeInfo}👤 <b>Account:</b> <code>${accountEmail}</code>
 ⏰ <b>Detected:</b> ${new Date().toLocaleString()}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
