@@ -88,12 +88,12 @@ export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
     mode: 'earliest_slot',
 
-    // Account credentials - 4 Gmail accounts
+    // Account credentials - 4 mailnesia accounts
     accounts: [
-        { email: 'ahammedx2@gmail.com', password: 'Trav@123' },  // Account 1 - runs at :19
-        { email: 'ahammedx3@gmail.com', password: 'Trav@123' },  // Account 2 - runs at :29
-        { email: 'ahammedx4@gmail.com', password: 'Trav@123' },  // Account 3 - runs at :49
-        { email: 'ahammedx5@gmail.com', password: 'Trav@123' },  // Account 4 - runs at :59
+        { email: 'ahammedx2@mailnesia.com', password: 'Trav@123' },  // Account 1 - runs at :19
+        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },  // Account 2 - runs at :29
+        { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },  // Account 3 - runs at :49
+        { email: 'ahammedx5@mailnesia.com', password: 'Trav@123' },  // Account 4 - runs at :59
     ],
 
     // Check slot this many times per login (default: 5)
@@ -106,7 +106,7 @@ export const loopConfig: LoopConfig = {
     // Odd hours (1,3,5...): x2 at :29, x3 at :59
     // Even hours (2,4,6...): x4 at :29, x5 at :59
     schedule: {
-        enabled: true,
+        enabled: false,
         minutes: [29, 59],
 
         // Account mapping: 2-hour rotation (handled in code)
@@ -118,7 +118,7 @@ export const loopConfig: LoopConfig = {
 
     // Telegram settings
     telegram: {
-        enabled: true,  // Set to true to enable
+        enabled: false,  // Set to true to enable
         botToken: '8380612073:AAEEaPY_XMcJlsck_yzB2a8SN7cheXd10oE',  // Get from @BotFather
         chatId: '-1003568600391',       // Your Telegram chat ID
     },
@@ -127,7 +127,7 @@ export const loopConfig: LoopConfig = {
     subCategory: 'tourism',
 
     // Browser settings
-    headless: true,  // false = show browser window
+    headless: false,  // false = show browser window
     screenshots: true,
 
     // AWS IP Rotation (Enable ONLY on AWS EC2 with IAM Role)
