@@ -35,11 +35,17 @@ export interface LoopConfig {
 
     /**
      * Strict Schedule: Run only at specific minutes of the hour (e.g. 29, 59)
-     * If enabled, 'intervalMinutes' is ignored.
+     * If enabled, intervalMinutes is ignored.
      */
     schedule?: {
         enabled: boolean;
         minutes: number[]; // e.g. [29, 59]
+
+        // Account mapping: Each account runs at its assigned minute
+        accountMapping?: {
+            enabled: boolean;
+            mapping: number[];  // e.g. [29, 59] - mapping[i] is minute for account[i]
+        };
     };
 
     /**
@@ -82,9 +88,12 @@ export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
     mode: 'earliest_slot',
 
-    // Account credentials - add 2-3 accounts
+    // Account credentials - 4 Gmail accounts
     accounts: [
-        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' }
+        { email: 'ahammedx2@gmail.com', password: 'Trav@123' },  // Account 1 - runs at :19
+        { email: 'ahammedx3@gmail.com', password: 'Trav@123' },  // Account 2 - runs at :29
+        { email: 'ahammedx4@gmail.com', password: 'Trav@123' },  // Account 3 - runs at :49
+        { email: 'ahammedx5@gmail.com', password: 'Trav@123' },  // Account 4 - runs at :59
     ],
 
     // Check slot this many times per login (default: 5)
@@ -93,11 +102,18 @@ export const loopConfig: LoopConfig = {
     // Wait this many minutes between account cycles (default: 12)
     intervalMinutes: 12,
 
-    // Strict Schedule: Run only at these minutes (e.g. XX:29, XX:59)
-    // If enabled, intervalMinutes is ignored.
+    // Strict Schedule: 2-HOUR ROTATION
+    // Odd hours (1,3,5...): x2 at :29, x3 at :59
+    // Even hours (2,4,6...): x4 at :29, x5 at :59
     schedule: {
         enabled: true,
         minutes: [29, 59],
+
+        // Account mapping: 2-hour rotation (handled in code)
+        accountMapping: {
+            enabled: true,
+            mapping: [29, 59, 29, 59],  // x2:29, x3:59, x4:29, x5:59
+        },
     },
 
     // Telegram settings
@@ -149,6 +165,33 @@ export function validateConfig(): boolean {
     if (loopConfig.intervalMinutes < 1) {
         console.error('❌ intervalMinutes must be at least 1');
         return false;
+    }
+
+    // Validate account mapping if enabled
+    if (loopConfig.schedule?.accountMapping?.enabled) {
+        const mapping = loopConfig.schedule.accountMapping.mapping;
+        if (!mapping || mapping.length === 0) {
+            console.error('❌ Account mapping enabled but no mapping configured');
+            return false;
+        }
+
+        if (mapping.length !== loopConfig.accounts.length) {
+            console.error(`❌ Account mapping length (${mapping.length}) must match accounts length (${loopConfig.accounts.length})`);
+            return false;
+        }
+
+        // Check for valid minute values (0-59)
+        for (let i = 0; i < mapping.length; i++) {
+            if (mapping[i] < 0 || mapping[i] > 59) {
+                console.error(`❌ Invalid minute value in mapping[${i}]: ${mapping[i]} (must be 0-59)`);
+                return false;
+            }
+        }
+
+        console.log('✅ Account mapping validated:');
+        for (let i = 0; i < loopConfig.accounts.length; i++) {
+            console.log(`   Account ${i + 1} (${loopConfig.accounts[i].email}) → :${mapping[i].toString().padStart(2, '0')}`);
+        }
     }
 
     return true;

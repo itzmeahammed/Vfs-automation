@@ -49,44 +49,29 @@ export async function sendTelegramMessage(message: string): Promise<boolean> {
 }
 
 /**
- * Send slot found alert with enhanced visual formatting
+ * Send slot found alert with simplified format
  */
 export async function sendSlotAlert(slotDate: string, accountEmail: string): Promise<void> {
     // Parse the slot dates from the formatted string
     const slots = slotDate.split('\n').filter(line => line.trim());
 
-    let slotsFormatted = '';
+    let datesList = '';
     slots.forEach(slot => {
         // Extract applicant count and date
         const match = slot.match(/(\d+)[.,]\s*(\d+)[,\s]+Applicants is:\s*(\d{2}-\d{2}-\d{4})/i);
         if (match) {
             const applicants = match[2];
             const date = match[3];
-            slotsFormatted += `\n   🗓️  <b>${applicants} Applicant${applicants !== '1' ? 's' : ''}</b> → ${date}`;
+            datesList += `\n- ${date} - applicants ${applicants}`;
         } else {
-            slotsFormatted += `\n   📅  ${slot}`;
+            datesList += `\n- ${slot}`;
         }
     });
 
     const message = `
-🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
-⚡ <b>VFS SLOTS AVAILABLE!</b> ⚡
-🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
+🇯🇵 Dubai - Japan - E-Visa Tourist Single Entry - Tourism:${datesList}
 
-✨ <b>AVAILABLE DATES:</b>${slotsFormatted}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-👤 <b>Account:</b> <code>${accountEmail}</code>
-⏰ <b>Detected:</b> ${new Date().toLocaleString()}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔥 <b>ACTION REQUIRED!</b>
-👉 Login NOW and complete booking
-⚡ Slots fill up FAST!
-
-🔗 <a href="https://visa.vfsglobal.com/are/en/jpn/login">Click to Login</a>
+🔗 <a href="https://visa.vfsglobal.com/are/en/jpn/login">Link to visa center site</a>
     `.trim();
 
     await sendTelegramMessage(message);

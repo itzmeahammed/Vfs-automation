@@ -55,6 +55,32 @@ class LoopRunner {
         while (true) {
             // Strict Scheduling: Wait BEFORE the cycle if enabled
             if (loopConfig.schedule?.enabled) {
+                // Check if account mapping is enabled
+                if (loopConfig.schedule.accountMapping?.enabled) {
+                    const { accountIndex, minute } = await this.waitForNextScheduledAccount();
+
+                    this.cycleCount++;
+                    console.log('\n' + '═'.repeat(60));
+                    console.log(`🔄 CYCLE ${this.cycleCount} - Account ${accountIndex + 1} at :${minute.toString().padStart(2, '0')}`);
+                    console.log('═'.repeat(60));
+
+                    // Process only the scheduled account
+                    const account = loopConfig.accounts[accountIndex];
+                    console.log(`\n📧 Account ${accountIndex + 1}/${loopConfig.accounts.length}: ${account.email}`);
+
+                    try {
+                        await this.processAccount(account, accountIndex);
+                    } catch (error) {
+                        console.log(`❌ Error with account ${account.email}:`, error);
+                        await sendErrorAlert(String(error), account.email);
+                    }
+
+                    // Close browser after account
+                    await this.closeBrowser();
+                    continue; // Skip normal account loop
+                }
+
+                // Normal schedule mode - all accounts run at same time
                 await this.waitForNextSchedule();
             }
 
@@ -142,6 +168,80 @@ class LoopRunner {
     }
 
     /**
+     * Calculate and wait for the next scheduled account (2-HOUR ROTATION MODE)
+     * Odd hours (1,3,5...): x2 at :29, x3 at :59
+     * Even hours (2,4,6...): x4 at :29, x5 at :59
+     */
+    private async waitForNextScheduledAccount(): Promise<{ accountIndex: number; minute: number }> {
+        const mapping = loopConfig.schedule?.accountMapping?.mapping || [];
+        if (mapping.length === 0) {
+            console.log('⚠️ Account mapping enabled but no mapping configured. Using account 0.');
+            return { accountIndex: 0, minute: 0 };
+        }
+
+        const now = new Date();
+        const currentHour = now.getHours();
+        const candidates: Array<{ time: Date; accountIndex: number; minute: number }> = [];
+
+        // Determine which accounts to use based on odd/even hour
+        // Odd hours (1,3,5...): use accounts 0,1 (x2, x3)
+        // Even hours (0,2,4...): use accounts 2,3 (x4, x5)
+        const isOddHour = (hour: number) => hour % 2 === 1;
+
+        // Generate candidates for current hour
+        const currentHourAccounts = isOddHour(currentHour) ? [0, 1] : [2, 3];
+        for (const accIndex of currentHourAccounts) {
+            const assignedMinute = mapping[accIndex];
+            if (assignedMinute === undefined) continue;
+
+            const candidateTime = new Date(now);
+            candidateTime.setMinutes(assignedMinute, 0, 0);
+            if (candidateTime.getTime() > now.getTime()) {
+                candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
+            }
+        }
+
+        // Generate candidates for next hour
+        const nextHour = (currentHour + 1) % 24;
+        const nextHourAccounts = isOddHour(nextHour) ? [0, 1] : [2, 3];
+        for (const accIndex of nextHourAccounts) {
+            const assignedMinute = mapping[accIndex];
+            if (assignedMinute === undefined) continue;
+
+            const candidateTime = new Date(now);
+            candidateTime.setHours(currentHour + 1);
+            candidateTime.setMinutes(assignedMinute, 0, 0);
+            candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
+        }
+
+        // Find the earliest future time
+        candidates.sort((a, b) => a.time.getTime() - b.time.getTime());
+        const nextRun = candidates[0];
+
+        if (nextRun) {
+            const waitMs = nextRun.time.getTime() - now.getTime();
+            const waitMinutes = (waitMs / 60000).toFixed(1);
+            const account = loopConfig.accounts[nextRun.accountIndex];
+            const isOddHour = (hour: number) => hour % 2 === 1;
+            const hourType = isOddHour(nextRun.time.getHours()) ? 'ODD' : 'EVEN';
+            const accountPair = isOddHour(nextRun.time.getHours()) ? 'x2/x3' : 'x4/x5';
+
+            console.log('\n' + '═'.repeat(60));
+            console.log(`📅 2-HOUR ROTATION (${hourType} HOUR - ${accountPair})`);
+            console.log(`   Account ${nextRun.accountIndex + 1}: ${account.email}`);
+            console.log(`   Next Run: ${nextRun.time.toLocaleTimeString()} (:${nextRun.minute.toString().padStart(2, '0')})`);
+            console.log(`   Waiting:  ${waitMinutes} minutes`);
+            console.log('═'.repeat(60));
+
+            await this.sleep(waitMs);
+            return { accountIndex: nextRun.accountIndex, minute: nextRun.minute };
+        }
+
+        // Fallback
+        return { accountIndex: 0, minute: 0 };
+    }
+
+    /**
      * Process a single account - login, check slots N times, logout
      */
     private async processAccount(account: AccountCredentials, accountIndex: number): Promise<void> {
@@ -189,7 +289,7 @@ class LoopRunner {
                     await sendStatusUpdate(`⚠️ Failed: ${slotResult.error}\\n📧 ${account.email}`);
                 } else {
                     console.log('   ❌ No slot available');
-                    await sendStatusUpdate(`❌ No slot - Check ${slotCheck}/${loopConfig.slotsPerLogin}\\n📧 ${account.email}`);
+                    // Don't send Telegram notification for "no slot"
                 }
 
                 // Go back to dashboard for next check (if not last)
