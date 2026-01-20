@@ -168,8 +168,9 @@ class LoopRunner {
     }
 
     /**
-     * Calculate and wait for the next scheduled account (account mapping mode)
-     * Returns the account index and minute to run
+     * Calculate and wait for the next scheduled account (2-HOUR ROTATION MODE)
+     * Odd hours (1,3,5...): Accounts 0,1 at :29, :59
+     * Even hours (2,4,6...): Accounts 2,3 at :29, :59
      */
     private async waitForNextScheduledAccount(): Promise<{ accountIndex: number; minute: number }> {
         const mapping = loopConfig.schedule?.accountMapping?.mapping || [];
@@ -179,25 +180,38 @@ class LoopRunner {
         }
 
         const now = new Date();
+        const currentHour = now.getHours();
         const candidates: Array<{ time: Date; accountIndex: number; minute: number }> = [];
 
-        // Generate candidate run times for each account
-        for (let accIndex = 0; accIndex < loopConfig.accounts.length; accIndex++) {
+        // Determine which accounts to use based on odd/even hour
+        // Odd hours (1,3,5...): use accounts 0,1
+        // Even hours (0,2,4...): use accounts 2,3
+        const isOddHour = (hour: number) => hour % 2 === 1;
+
+        // Generate candidates for current hour
+        const currentHourAccounts = isOddHour(currentHour) ? [0, 1] : [2, 3];
+        for (const accIndex of currentHourAccounts) {
             const assignedMinute = mapping[accIndex];
             if (assignedMinute === undefined) continue;
 
-            // Candidate in current hour
-            const c1 = new Date(now);
-            c1.setMinutes(assignedMinute, 0, 0);
-            if (c1.getTime() > now.getTime()) {
-                candidates.push({ time: c1, accountIndex: accIndex, minute: assignedMinute });
+            const candidateTime = new Date(now);
+            candidateTime.setMinutes(assignedMinute, 0, 0);
+            if (candidateTime.getTime() > now.getTime()) {
+                candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
             }
+        }
 
-            // Candidate in next hour
-            const c2 = new Date(now);
-            c2.setHours(c2.getHours() + 1);
-            c2.setMinutes(assignedMinute, 0, 0);
-            candidates.push({ time: c2, accountIndex: accIndex, minute: assignedMinute });
+        // Generate candidates for next hour
+        const nextHour = (currentHour + 1) % 24;
+        const nextHourAccounts = isOddHour(nextHour) ? [0, 1] : [2, 3];
+        for (const accIndex of nextHourAccounts) {
+            const assignedMinute = mapping[accIndex];
+            if (assignedMinute === undefined) continue;
+
+            const candidateTime = new Date(now);
+            candidateTime.setHours(currentHour + 1);
+            candidateTime.setMinutes(assignedMinute, 0, 0);
+            candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
         }
 
         // Find the earliest future time
@@ -208,9 +222,12 @@ class LoopRunner {
             const waitMs = nextRun.time.getTime() - now.getTime();
             const waitMinutes = (waitMs / 60000).toFixed(1);
             const account = loopConfig.accounts[nextRun.accountIndex];
+            const isOddHour = (hour: number) => hour % 2 === 1;
+            const hourType = isOddHour(nextRun.time.getHours()) ? 'ODD' : 'EVEN';
+            const accountPair = isOddHour(nextRun.time.getHours()) ? 'Acc1/Acc2' : 'Acc3/Acc4';
 
             console.log('\n' + '═'.repeat(60));
-            console.log(`📅 ACCOUNT-SPECIFIC SCHEDULE`);
+            console.log(`📅 2-HOUR ROTATION (${hourType} HOUR - ${accountPair})`);
             console.log(`   Account ${nextRun.accountIndex + 1}: ${account.email}`);
             console.log(`   Next Run: ${nextRun.time.toLocaleTimeString()} (:${nextRun.minute.toString().padStart(2, '0')})`);
             console.log(`   Waiting:  ${waitMinutes} minutes`);

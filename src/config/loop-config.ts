@@ -112,37 +112,45 @@ export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
     mode: 'earliest_slot',
 
-    // Account credentials - add 2-3 accounts
-    // Each account can have its own Gmail App Password for OTP
+    // Account credentials - 4 accounts for Italy
+    // Each account has its own Gmail App Password for OTP
     accounts: [
         {
             email: 'abeerporto7@gmail.com',
             password: 'Trav@123',
-            gmailAppPassword: 'hrkg mylh pqbm xrbm',  // Abeer's Gmail App Password
+            gmailAppPassword: 'hrkg mylh pqbm xrbm',  // Account 1 - Odd hours :29
         },
         {
             email: 'carlomaria198711@gmail.com',
             password: 'Anypassw0rd@',
-            gmailAppPassword: 'mctm somb ortc pulv',  // Carlo's Gmail App Password
+            gmailAppPassword: 'mctm somb ortc pulv',  // Account 2 - Odd hours :59
+        },
+        {
+            email: 'ACCOUNT3@gmail.com',  // ADD YOUR EMAIL
+            password: 'PASSWORD3',         // ADD YOUR PASSWORD
+            gmailAppPassword: 'xxxx xxxx xxxx xxxx',  // Account 3 - Even hours :29 (ADD APP PASSWORD)
+        },
+        {
+            email: 'ACCOUNT4@gmail.com',  // ADD YOUR EMAIL
+            password: 'PASSWORD4',         // ADD YOUR PASSWORD
+            gmailAppPassword: 'yyyy yyyy yyyy yyyy',  // Account 4 - Even hours :59 (ADD APP PASSWORD)
         },
     ],
 
     // Wait this many minutes between account cycles (default: 12)
     intervalMinutes: 12,
 
-    // Strict Schedule: Run only at these minutes (e.g. XX:29, XX:59)
-    // If enabled, intervalMinutes is ignored.
+    // Strict Schedule: 2-HOUR ROTATION for Italy
+    // Odd hours (1,3,5...): Account 1 at :29, Account 2 at :59
+    // Even hours (2,4,6...): Account 3 at :29, Account 4 at :59
     schedule: {
         enabled: true,
         minutes: [29, 59],
 
-        // OPTIONAL: Map accounts to specific minutes
-        // If enabled with 2 accounts:
-        //   - Account 1 runs ONLY at XX:29
-        //   - Account 2 runs ONLY at XX:59
+        // Account mapping: 2-hour rotation (handled automatically in code)
         accountMapping: {
-            enabled: false,  // Set to true to enable account-to-minute mapping
-            mapping: [29, 59],  // mapping[0]=29 for account[0], mapping[1]=59 for account[1]
+            enabled: true,
+            mapping: [29, 59, 29, 59],  // Acc1:29, Acc2:59, Acc3:29, Acc4:59
         },
     },
 
