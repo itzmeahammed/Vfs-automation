@@ -17,7 +17,7 @@ import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegra
 import { rotateAWSPublicIP } from './utils/aws-ip-rotator.js';
 
 // VFS URLs
-const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/mlt/dashboard';
+const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/jpn/dashboard';
 const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/jpn/login';
 
 /**
@@ -168,9 +168,11 @@ class LoopRunner {
     }
 
     /**
-     * Calculate and wait for the next scheduled account (2-HOUR ROTATION MODE)
-     * Odd hours (1,3,5...): x2 at :29, x3 at :59
-     * Even hours (2,4,6...): x4 at :29, x5 at :59
+     * Calculate and wait for the next scheduled account (4-HOUR ROTATION MODE)
+     * Hour%4==0 (0,4,8,12,16,20): Accounts 0,1 (x2,x3)
+     * Hour%4==1 (1,5,9,13,17,21): Accounts 2,3 (x4,x5)
+     * Hour%4==2 (2,6,10,14,18,22): Accounts 4,5 (x6,x7)
+     * Hour%4==3 (3,7,11,15,19,23): Accounts 6,7 (x8,x9)
      */
     private async waitForNextScheduledAccount(): Promise<{ accountIndex: number; minute: number }> {
         const mapping = loopConfig.schedule?.accountMapping?.mapping || [];
@@ -183,13 +185,17 @@ class LoopRunner {
         const currentHour = now.getHours();
         const candidates: Array<{ time: Date; accountIndex: number; minute: number }> = [];
 
-        // Determine which accounts to use based on odd/even hour
-        // Odd hours (1,3,5...): use accounts 0,1 (x2, x3)
-        // Even hours (0,2,4...): use accounts 2,3 (x4, x5)
-        const isOddHour = (hour: number) => hour % 2 === 1;
+        // Determine which accounts to use based on hour % 4
+        const getAccountPair = (hour: number): number[] => {
+            const mod = hour % 4;
+            if (mod === 0) return [0, 1];  // x2, x3
+            if (mod === 1) return [2, 3];  // x4, x5
+            if (mod === 2) return [4, 5];  // x6, x7
+            return [6, 7];  // x8, x9
+        };
 
         // Generate candidates for current hour
-        const currentHourAccounts = isOddHour(currentHour) ? [0, 1] : [2, 3];
+        const currentHourAccounts = getAccountPair(currentHour);
         for (const accIndex of currentHourAccounts) {
             const assignedMinute = mapping[accIndex];
             if (assignedMinute === undefined) continue;
@@ -203,7 +209,7 @@ class LoopRunner {
 
         // Generate candidates for next hour
         const nextHour = (currentHour + 1) % 24;
-        const nextHourAccounts = isOddHour(nextHour) ? [0, 1] : [2, 3];
+        const nextHourAccounts = getAccountPair(nextHour);
         for (const accIndex of nextHourAccounts) {
             const assignedMinute = mapping[accIndex];
             if (assignedMinute === undefined) continue;
@@ -222,12 +228,12 @@ class LoopRunner {
             const waitMs = nextRun.time.getTime() - now.getTime();
             const waitMinutes = (waitMs / 60000).toFixed(1);
             const account = loopConfig.accounts[nextRun.accountIndex];
-            const isOddHour = (hour: number) => hour % 2 === 1;
-            const hourType = isOddHour(nextRun.time.getHours()) ? 'ODD' : 'EVEN';
-            const accountPair = isOddHour(nextRun.time.getHours()) ? 'x2/x3' : 'x4/x5';
+            const hourMod = nextRun.time.getHours() % 4;
+            const cycleLabel = `Cycle ${hourMod + 1}/4`;
+            const accountPairNames = ['x2/x3', 'x4/x5', 'x6/x7', 'x8/x9'][hourMod];
 
             console.log('\n' + '═'.repeat(60));
-            console.log(`📅 2-HOUR ROTATION (${hourType} HOUR - ${accountPair})`);
+            console.log(`📅 4-HOUR ROTATION (${cycleLabel} - ${accountPairNames})`);
             console.log(`   Account ${nextRun.accountIndex + 1}: ${account.email}`);
             console.log(`   Next Run: ${nextRun.time.toLocaleTimeString()} (:${nextRun.minute.toString().padStart(2, '0')})`);
             console.log(`   Waiting:  ${waitMinutes} minutes`);
@@ -338,13 +344,53 @@ class LoopRunner {
 
     /**
      * Go back to dashboard (for next slot check)
+     * Enhanced: Properly waits for dashboard loader and verifies page is ready
      */
     private async goBackToDashboard(): Promise<void> {
         if (!this.page) return;
 
         console.log('   ↩️ Going back to dashboard...');
         await this.page.goto(VFS_DASHBOARD_URL, { waitUntil: 'domcontentloaded' });
-        await delay(3000);
+
+        // CRITICAL: Wait for loader to disappear
+        console.log('   ⏳ Waiting for dashboard loader...');
+        const loaderSelectors = [
+            '.loader', '.spinner', '.loading',
+            'mat-spinner', '.mat-progress-spinner',
+            '.mat-mdc-progress-spinner', 'mat-progress-spinner',
+            '.cdk-overlay-backdrop', '[role="progressbar"]',
+        ];
+
+        // Wait up to 30 seconds for loader to disappear
+        for (const selector of loaderSelectors) {
+            try {
+                const loader = this.page.locator(selector);
+                if (await loader.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    console.log(`   🔄 Found loader (${selector}), waiting...`);
+                    await loader.waitFor({ state: 'hidden', timeout: 30000 }).catch(() => { });
+                    console.log('   ✅ Loader disappeared');
+                }
+            } catch {
+                // Continue checking other selectors
+            }
+        }
+
+        // Wait for dashboard to render
+        console.log('   ⏳ Waiting for dashboard to render (5 sec)...');
+        await delay(5000);
+
+        // Verify "Start New Booking" button is visible
+        try {
+            const buttonVisible = await this.page.locator('button.custom-height-button').isVisible({ timeout: 5000 }).catch(() => false);
+            if (buttonVisible) {
+                console.log('   ✅ Dashboard ready - "Start New Booking" button found');
+            } else {
+                console.log('   ⚠️ Button not visible yet, waiting additional 3 seconds...');
+                await delay(3000);
+            }
+        } catch (error) {
+            console.log('   ⚠️ Could not verify button, but continuing...');
+        }
     }
 
     /**

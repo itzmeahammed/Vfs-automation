@@ -88,12 +88,16 @@ export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
     mode: 'earliest_slot',
 
-    // Account credentials - 4 mailnesia accounts
+    // Account credentials - 8 mailnesia accounts for 4-hour rotation
     accounts: [
-        { email: 'ahammedx2@mailnesia.com', password: 'Trav@123' },  // Account 1 - runs at :19
-        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },  // Account 2 - runs at :29
-        { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },  // Account 3 - runs at :49
-        { email: 'ahammedx5@mailnesia.com', password: 'Trav@123' },  // Account 4 - runs at :59
+        { email: 'ahammedx2@mailnesia.com', password: 'Trav@123' },  // Accounts 0,1 - Hour%4==0
+        { email: 'ahammedx3@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx4@mailnesia.com', password: 'Trav@123' },  // Accounts 2,3 - Hour%4==1
+        { email: 'ahammedx5@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx6@mailnesia.com', password: 'Trav@123' },  // Accounts 4,5 - Hour%4==2
+        { email: 'ahammedx7@mailnesia.com', password: 'Trav@123' },
+        { email: 'ahammedx8@mailnesia.com', password: 'Trav@123' },  // Accounts 6,7 - Hour%4==3
+        { email: 'ahammedx9@mailnesia.com', password: 'Trav@123' },
     ],
 
     // Check slot this many times per login (default: 5)
@@ -102,23 +106,25 @@ export const loopConfig: LoopConfig = {
     // Wait this many minutes between account cycles (default: 12)
     intervalMinutes: 12,
 
-    // Strict Schedule: 2-HOUR ROTATION
-    // Odd hours (1,3,5...): x2 at :29, x3 at :59
-    // Even hours (2,4,6...): x4 at :29, x5 at :59
+    // Strict Schedule: 4-HOUR ROTATION
+    // Hour%4==0 (0,4,8,12,16,20): x2 at :29, x3 at :59
+    // Hour%4==1 (1,5,9,13,17,21): x4 at :29, x5 at :59
+    // Hour%4==2 (2,6,10,14,18,22): x6 at :29, x7 at :59
+    // Hour%4==3 (3,7,11,15,19,23): x8 at :29, x9 at :59
     schedule: {
         enabled: false,
         minutes: [29, 59],
 
-        // Account mapping: 2-hour rotation (handled in code)
+        // Account mapping: 4-hour rotation (handled in code)
         accountMapping: {
             enabled: true,
-            mapping: [29, 59, 29, 59],  // x2:29, x3:59, x4:29, x5:59
+            mapping: [29, 59, 29, 59, 29, 59, 29, 59],  // All 8 accounts
         },
     },
 
     // Telegram settings
     telegram: {
-        enabled: false,  // Set to true to enable
+        enabled: true,  // Set to true to enable
         botToken: '8380612073:AAEEaPY_XMcJlsck_yzB2a8SN7cheXd10oE',  // Get from @BotFather
         chatId: '-1003568600391',       // Your Telegram chat ID
     },

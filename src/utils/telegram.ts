@@ -78,32 +78,17 @@ export async function sendSlotAlert(slotDate: string, accountEmail: string): Pro
 }
 
 /**
- * Send status update
+ * Send status update (DISABLED - only slot alerts are sent)
  */
 export async function sendStatusUpdate(status: string): Promise<void> {
-    const message = `
-📊 <b>VFS Bot Status</b>
-
-${status}
-
-⏰ ${new Date().toLocaleString()}
-    `.trim();
-
-    await sendTelegramMessage(message);
+    // Disabled - don't send status updates to Telegram
+    return;
 }
 
 /**
- * Send error alert
+ * Send error alert (DISABLED - only slot alerts are sent)
  */
 export async function sendErrorAlert(error: string, accountEmail?: string): Promise<void> {
-    const message = `
-❌ <b>VFS Bot Error</b>
-
-${accountEmail ? `📧 <b>Account:</b> ${accountEmail}\n` : ''}
-🔴 <b>Error:</b> ${error}
-
-⏰ ${new Date().toLocaleString()}
-    `.trim();
-
-    await sendTelegramMessage(message);
+    // Disabled - don't send error alerts to Telegram
+    return;
 }
