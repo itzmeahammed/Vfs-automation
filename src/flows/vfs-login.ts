@@ -17,12 +17,12 @@ import {
     EnvironmentMonitor,
     type StateIndicators,
 } from '../core/index.js';
-import { waitForOTP, type GmailConfig } from '../utils/gmail-otp.js';
+import { waitForOTP, type OTPConfig } from '../utils/otp-fetcher.js';
 
 export interface LoginCredentials {
     email: string;
     password: string;
-    gmailConfig?: GmailConfig; // For OTP fetching (VFS Italy)
+    otpConfig?: OTPConfig; // For OTP fetching (Gmail or Mailnesia)
 }
 
 export interface LoginResult {
@@ -415,9 +415,9 @@ export class VFSLoginFlow {
 
             // Check for OTP page (VFS Italy)
             const otpPageDetected = await this.isOTPPage();
-            if (otpPageDetected && credentials.gmailConfig) {
+            if (otpPageDetected && credentials.otpConfig) {
                 console.log('\n📱 OTP page detected - handling OTP verification...');
-                const otpResult = await this.handleOTPPage(credentials.gmailConfig);
+                const otpResult = await this.handleOTPPage(credentials.otpConfig);
                 if (!otpResult) {
                     return {
                         success: false,
@@ -931,18 +931,18 @@ export class VFSLoginFlow {
     }
 
     /**
-     * Handle OTP page - fetch OTP from Gmail and submit
+     * Handle OTP page - fetch OTP from email provider (Gmail or Mailnesia)
      */
-    private async handleOTPPage(gmailConfig: GmailConfig): Promise<boolean> {
+    private async handleOTPPage(otpConfig: OTPConfig): Promise<boolean> {
         try {
             console.log('📱 OTP page detected');
-            console.log('   📧 Fetching OTP from Gmail...');
+            console.log('   📧 Fetching OTP from email provider...');
 
-            // Wait for OTP email with retry
-            const otp = await waitForOTP(gmailConfig, 6, 10000); // 6 retries, 10s each = 60s total
+            // Wait for OTP email with retry (auto-detects Gmail vs Mailnesia)
+            const otp = await waitForOTP(otpConfig, 6, 10000); // 6 retries, 10s each = 60s total
 
             if (!otp) {
-                console.log('   ❌ Could not fetch OTP from Gmail');
+                console.log('   ❌ Could not fetch OTP from email provider');
                 return false;
             }
 

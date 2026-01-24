@@ -112,45 +112,61 @@ export const loopConfig: LoopConfig = {
     // Mode: 'earliest_slot' (quick check) or 'full_scenario' (complete booking)
     mode: 'earliest_slot',
 
-    // Account credentials - 4 accounts for Italy
-    // Each account has its own Gmail App Password for OTP
+    // Account credentials - 6 Gmail accounts for Italy (3-hour rotation)
+    // ALL GMAIL ACCOUNTS
+    // 
+    // 3-Hour Rotation:
+    //   Hours 0,3,6,9,12,15,18,21  → Accounts 1,2 at :29, :59
+    //   Hours 1,4,7,10,13,16,19,22 → Accounts 3,4 at :29, :59
+    //   Hours 2,5,8,11,14,17,20,23 → Accounts 5,6 at :29, :59
     accounts: [
         {
             email: 'abeerporto7@gmail.com',
             password: 'Trav@123',
-            gmailAppPassword: 'hrkg mylh pqbm xrbm',  // Account 1 - Odd hours :29
+            gmailAppPassword: 'hrkg mylh pqbm xrbm',  // Account 1 - Hour%3=0, :29
         },
         {
             email: 'carlomaria198711@gmail.com',
             password: 'Anypassw0rd@',
-            gmailAppPassword: 'mctm somb ortc pulv',  // Account 2 - Odd hours :59
+            gmailAppPassword: 'mctm somb ortc pulv',  // Account 2 - Hour%3=0, :59
         },
         {
-            email: 'ACCOUNT3@gmail.com',  // ADD YOUR EMAIL
-            password: 'PASSWORD3',         // ADD YOUR PASSWORD
-            gmailAppPassword: 'xxxx xxxx xxxx xxxx',  // Account 3 - Even hours :29 (ADD APP PASSWORD)
+            email: 'shehanwije2024@gmail.com',
+            password: 'Trav@123',
+            gmailAppPassword: 'mdbp uctx yzij fvxq',  // Account 3 - Hour%3=1, :29
         },
         {
-            email: 'ACCOUNT4@gmail.com',  // ADD YOUR EMAIL
-            password: 'PASSWORD4',         // ADD YOUR PASSWORD
-            gmailAppPassword: 'yyyy yyyy yyyy yyyy',  // Account 4 - Even hours :59 (ADD APP PASSWORD)
+            email: 'shilpaunnitravnook@gmail.com',
+            password: 'Trav@123',
+            gmailAppPassword: 'idqw wddv dtkk sxcs',  // Account 4 - Hour%3=1, :59
+        },
+        {
+            email: 'stravnook@gmail.com',
+            password: 'Trav@123',
+            gmailAppPassword: 'lxnb nhcs trjt foeg',  // Account 5 - Hour%3=2, :29
+        },
+        {
+            email: 'mayumekorea@gmail.com',
+            password: 'Trav@123',
+            gmailAppPassword: 'cjiy crsa zvtt hplg',  // Account 6 - Hour%3=2, :59
         },
     ],
 
     // Wait this many minutes between account cycles (default: 12)
     intervalMinutes: 12,
 
-    // Strict Schedule: 2-HOUR ROTATION for Italy
-    // Odd hours (1,3,5...): Account 1 at :29, Account 2 at :59
-    // Even hours (2,4,6...): Account 3 at :29, Account 4 at :59
+    // Strict Schedule: 3-HOUR ROTATION for Italy (6 Gmail accounts)
+    // Hours 0,3,6,9,12,15,18,21  → Accounts 1,2 at :29, :59
+    // Hours 1,4,7,10,13,16,19,22 → Accounts 3,4 at :29, :59
+    // Hours 2,5,8,11,14,17,20,23 → Accounts 5,6 at :29, :59
     schedule: {
         enabled: true,
         minutes: [29, 59],
 
-        // Account mapping: 2-hour rotation (handled automatically in code)
+        // Account mapping: 3-hour rotation
         accountMapping: {
             enabled: true,
-            mapping: [29, 59, 29, 59],  // Acc1:29, Acc2:59, Acc3:29, Acc4:59
+            mapping: [29, 59, 29, 59, 29, 59],  // Acc1:29, Acc2:59, Acc3:29, Acc4:59, Acc5:29, Acc6:59
         },
     },
 

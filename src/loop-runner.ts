@@ -17,7 +17,7 @@ import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegra
 import { rotateAWSPublicIP } from './utils/aws-ip-rotator.js';
 
 // VFS URLs
-const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/mlt/dashboard';
+const VFS_DASHBOARD_URL = 'https://visa.vfsglobal.com/are/en/ita/dashboard';
 const VFS_LOGIN_URL = 'https://visa.vfsglobal.com/are/en/ita/login';
 
 /**
@@ -168,9 +168,10 @@ class LoopRunner {
     }
 
     /**
-     * Calculate and wait for the next scheduled account (2-HOUR ROTATION MODE)
-     * Odd hours (1,3,5...): Accounts 0,1 at :29, :59
-     * Even hours (2,4,6...): Accounts 2,3 at :29, :59
+     * Calculate and wait for the next scheduled account (3-HOUR ROTATION MODE)
+     * Hour % 3 == 0 (0,3,6,9,12,15,18,21):  Accounts 0,1 at :29, :59
+     * Hour % 3 == 1 (1,4,7,10,13,16,19,22): Accounts 2,3 at :29, :59
+     * Hour % 3 == 2 (2,5,8,11,14,17,20,23): Accounts 4,5 at :29, :59
      */
     private async waitForNextScheduledAccount(): Promise<{ accountIndex: number; minute: number }> {
         const mapping = loopConfig.schedule?.accountMapping?.mapping || [];
@@ -183,13 +184,20 @@ class LoopRunner {
         const currentHour = now.getHours();
         const candidates: Array<{ time: Date; accountIndex: number; minute: number }> = [];
 
-        // Determine which accounts to use based on odd/even hour
-        // Odd hours (1,3,5...): use accounts 0,1
-        // Even hours (0,2,4...): use accounts 2,3
-        const isOddHour = (hour: number) => hour % 2 === 1;
+        // Determine which accounts to use based on hour % 3
+        // Hour % 3 == 0: use accounts 0,1
+        // Hour % 3 == 1: use accounts 2,3
+        // Hour % 3 == 2: use accounts 4,5
+        const getHourBlock = (hour: number) => hour % 3;
+        const getAccountsForBlock = (block: number) => {
+            if (block === 0) return [0, 1];
+            if (block === 1) return [2, 3];
+            return [4, 5];
+        };
 
         // Generate candidates for current hour
-        const currentHourAccounts = isOddHour(currentHour) ? [0, 1] : [2, 3];
+        const currentBlock = getHourBlock(currentHour);
+        const currentHourAccounts = getAccountsForBlock(currentBlock);
         for (const accIndex of currentHourAccounts) {
             const assignedMinute = mapping[accIndex];
             if (assignedMinute === undefined) continue;
@@ -201,17 +209,21 @@ class LoopRunner {
             }
         }
 
-        // Generate candidates for next hour
-        const nextHour = (currentHour + 1) % 24;
-        const nextHourAccounts = isOddHour(nextHour) ? [0, 1] : [2, 3];
-        for (const accIndex of nextHourAccounts) {
-            const assignedMinute = mapping[accIndex];
-            if (assignedMinute === undefined) continue;
+        // Generate candidates for next 3 hours (to cover all possible blocks)
+        for (let i = 1; i <= 3; i++) {
+            const futureHour = (currentHour + i) % 24;
+            const futureBlock = getHourBlock(futureHour);
+            const futureHourAccounts = getAccountsForBlock(futureBlock);
 
-            const candidateTime = new Date(now);
-            candidateTime.setHours(currentHour + 1);
-            candidateTime.setMinutes(assignedMinute, 0, 0);
-            candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
+            for (const accIndex of futureHourAccounts) {
+                const assignedMinute = mapping[accIndex];
+                if (assignedMinute === undefined) continue;
+
+                const candidateTime = new Date(now);
+                candidateTime.setHours(currentHour + i);
+                candidateTime.setMinutes(assignedMinute, 0, 0);
+                candidates.push({ time: candidateTime, accountIndex: accIndex, minute: assignedMinute });
+            }
         }
 
         // Find the earliest future time
@@ -222,12 +234,12 @@ class LoopRunner {
             const waitMs = nextRun.time.getTime() - now.getTime();
             const waitMinutes = (waitMs / 60000).toFixed(1);
             const account = loopConfig.accounts[nextRun.accountIndex];
-            const isOddHour = (hour: number) => hour % 2 === 1;
-            const hourType = isOddHour(nextRun.time.getHours()) ? 'ODD' : 'EVEN';
-            const accountPair = isOddHour(nextRun.time.getHours()) ? 'Acc1/Acc2' : 'Acc3/Acc4';
+            const hourBlock = getHourBlock(nextRun.time.getHours());
+            const blockLabels = ['Block 0 (0,3,6,9,12,15,18,21)', 'Block 1 (1,4,7,10,13,16,19,22)', 'Block 2 (2,5,8,11,14,17,20,23)'];
+            const accountPairs = ['Acc1/Acc2', 'Acc3/Acc4', 'Acc5/Acc6'];
 
             console.log('\n' + '═'.repeat(60));
-            console.log(`📅 2-HOUR ROTATION (${hourType} HOUR - ${accountPair})`);
+            console.log(`📅 3-HOUR ROTATION (${blockLabels[hourBlock]} - ${accountPairs[hourBlock]})`);
             console.log(`   Account ${nextRun.accountIndex + 1}: ${account.email}`);
             console.log(`   Next Run: ${nextRun.time.toLocaleTimeString()} (:${nextRun.minute.toString().padStart(2, '0')})`);
             console.log(`   Waiting:  ${waitMinutes} minutes`);
@@ -256,17 +268,17 @@ class LoopRunner {
             screenshotOnError: true,
         });
 
-        // Determine Gmail config for this account
+        // Determine OTP config for this account
         // Use account-specific gmailAppPassword if set, otherwise fall back to global config
-        const gmailConfig = loopConfig.gmail.enabled ? {
-            user: account.email,  // Use account's own email for OTP
+        const otpConfig = loopConfig.gmail.enabled ? {
+            email: account.email,  // Use account's own email for OTP
             password: account.gmailAppPassword || loopConfig.gmail.appPassword  // Account-specific or global
         } : undefined;
 
         const loginResult = await loginFlow.execute({
             email: account.email,
             password: account.password,
-            gmailConfig: gmailConfig
+            otpConfig: otpConfig
         });
 
         if (!loginResult.success) {
