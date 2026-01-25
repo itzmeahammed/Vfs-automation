@@ -1,0 +1,19 @@
+[Unit]
+Description=VFS Automation Bot - Italy Visa Slot Checker
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/vfs-automation
+ExecStart=/usr/bin/npm run loop
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/vfs-automation/logs/bot.log
+StandardError=append:/home/ubuntu/vfs-automation/logs/error.log
+
+# Environment
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

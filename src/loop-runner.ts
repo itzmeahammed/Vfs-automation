@@ -13,7 +13,7 @@ import { setTimingMode, delay } from './config/timing-config.js';
 import { BrowserIdentityManager } from './core/browser-identity.js';
 import { VFSLoginFlow } from './flows/vfs-login.js';
 import { VFSBookingFlow } from './flows/vfs-booking.js';
-import { sendSlotAlert, sendStatusUpdate, sendErrorAlert } from './utils/telegram.js';
+import { sendSlotAlert } from './utils/telegram.js';
 import { rotateAWSPublicIP } from './utils/aws-ip-rotator.js';
 
 // VFS URLs
@@ -48,8 +48,7 @@ class LoopRunner {
         // Set timing mode - FAST for quick slot checks
         setTimingMode('fast');
 
-        // Send startup notification
-        await sendStatusUpdate(`🚀 Bot started!\n\n📧 Accounts: ${loopConfig.accounts.length}\n🔁 Mode: ${loopConfig.mode}\n⏱️ Interval: ${loopConfig.intervalMinutes} min`);
+        // Startup - no notification
 
         // Main infinite loop
         while (true) {
@@ -72,7 +71,8 @@ class LoopRunner {
                         await this.processAccount(account, accountIndex);
                     } catch (error) {
                         console.log(`❌ Error with account ${account.email}:`, error);
-                        await sendErrorAlert(String(error), account.email);
+                        console.log();
+                        // No Telegram notification for errors
                     }
 
                     // Close browser after account
@@ -98,7 +98,8 @@ class LoopRunner {
                     await this.processAccount(account, accIndex);
                 } catch (error) {
                     console.log(`❌ Error with account ${account.email}:`, error);
-                    await sendErrorAlert(String(error), account.email);
+                    console.log();
+                    // No Telegram notification for errors
                 }
 
                 // Close browser after each account
@@ -283,11 +284,11 @@ class LoopRunner {
 
         if (!loginResult.success) {
             console.log(`❌ Login failed: ${loginResult.message}`);
-            await sendErrorAlert(`Login failed: ${loginResult.message}`, account.email);
+            // No Telegram notification for login errors
             return;
         }
         console.log('✅ Login successful');
-        await sendStatusUpdate(`✅ Logged in: ${account.email}`);
+        // No Telegram notification for login success
 
         // Determine visa types to check
         const visaTypes = loopConfig.visaTypes && loopConfig.visaTypes.length > 0
@@ -330,11 +331,11 @@ class LoopRunner {
                         // TODO: Continue with full booking flow
                     }
                 } else if (slotResult.error) {
-                    console.log(`   ⚠️ Failed for ${visaLabel}: ${slotResult.error}`);
-                    await sendStatusUpdate(`⚠️ Failed: ${slotResult.error}\n📍 ${visaLabel}\n📧 ${account.email}`);
-                } else {
-                    console.log(`   ❌ No slot for ${visaLabel}`);
-                    await sendStatusUpdate(`❌ No slot for ${visaLabel}\n📧 ${account.email}`);
+                    // No notification for check failures
+                    console.log(`⚠️ Check failed: ${slotResult.error}`);
+                } else if (!slotResult.found) {
+                    // No notification when no slots found
+                    console.log(`❌ No slots for ${visaLabel}`);
                 }
 
                 // Go back to dashboard for next visa type (if not last)

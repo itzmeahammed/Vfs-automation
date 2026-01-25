@@ -73,6 +73,7 @@ export async function sendSlotAlert(slotDate: string, accountEmail: string, visa
     const message = `
 🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
 ⚡ <b>VFS SLOTS AVAILABLE!</b> ⚡
+🇮🇹 <b>ITALY - DUBAI</b> 🇦🇪
 🚨 <b>━━━━━━━━━━━━━━━━━━━━━━</b> 🚨
 
 ✨ <b>AVAILABLE DATES:</b>${slotsFormatted}
